@@ -38,6 +38,21 @@ RATINGS_GZ = Path("title.ratings.tsv.gz")
 RATINGS_URL = "https://datasets.imdbws.com/title.ratings.tsv.gz"
 MIN_MINUTES = 75          # abaixo disto não é tratado como filme
 REQUEST_DELAY = 1.0       # segundos entre pedidos ao site
+
+
+def load_dotenv(path=".env"):
+    """Lê KEY=valor de um .env local, sem sobrepor variáveis já definidas."""
+    p = Path(path)
+    if not p.exists():
+        return
+    for line in p.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if line and not line.startswith("#") and "=" in line:
+            k, v = line.split("=", 1)
+            os.environ.setdefault(k.strip(), v.strip().strip("\"'"))
+
+
+load_dotenv()
 TMDB_KEY = os.environ.get("TMDB_API_KEY")
 
 CHANNELS = [
