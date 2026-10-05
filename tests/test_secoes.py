@@ -69,7 +69,7 @@ class SeccoesTest(unittest.TestCase):
             self.sec[name] = part
 
     def titulos(self, secao):
-        return re.findall(r"<a href='[^']*'>([^<]+)</a>", self.sec[secao])
+        return re.findall(r"<a href='https://www\.imdb\.com[^']*'>([^<]+)</a>", self.sec[secao])
 
     def test_para_gravar_ordenado_por_rating(self):
         self.assertEqual(self.titulos("Para gravar"), ["Epsilon", "Alfa", "Zeta"])

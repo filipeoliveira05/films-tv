@@ -308,26 +308,44 @@ def match_title(title, minutes):
     return d["imdb_id"], d.get("original_title"), (d.get("release_date") or "")[:4], d["runtime"]
 
 
-def match_titles(db):
+RETRY_DAYS = 30           # os falhanços de matching são repetidos ao fim deste tempo
+
+
+def migrate(db, now=None):
+    """Bases de dados antigas: acrescenta matches.checked (falhanços antigos contam como verificados agora)."""
+    cols = [r[1] for r in db.execute("PRAGMA table_info(matches)")]
+    if "checked" not in cols:
+        db.execute("ALTER TABLE matches ADD COLUMN checked TEXT")
+    db.execute("UPDATE matches SET checked = ? WHERE checked IS NULL", ((now or datetime.now()).isoformat(),))
+    db.commit()
+
+
+def titles_to_match(db, now=None):
+    """Títulos ainda sem match, mais os falhanços verificados há mais de RETRY_DAYS dias."""
+    limit = ((now or datetime.now()) - timedelta(days=RETRY_DAYS)).isoformat()
     rows = db.execute(
         """SELECT title, MAX((julianday(end) - julianday(start)) * 1440) AS mins
            FROM airings
-           WHERE title NOT IN (SELECT title FROM matches)
+           WHERE title NOT IN (SELECT title FROM matches WHERE imdb_id IS NOT NULL OR checked >= ?)
              AND (julianday(end) - julianday(start)) * 1440 >= ?
            GROUP BY title""",
-        (MIN_MINUTES,),
+        (limit, MIN_MINUTES),
     ).fetchall()
-    rows = [r for r in rows if not is_series(r[0])]
+    return [r for r in rows if not is_series(r[0])]
+
+
+def match_titles(db):
+    rows = titles_to_match(db)
     for n, (title, mins) in enumerate(rows, 1):
         try:
             res = match_title(title, mins)
         except requests.RequestException as e:
             print(f"! TMDB falhou em '{title}': {e}", file=sys.stderr)
             continue
-        # guarda também os falhanços (imdb_id NULL) para não repetir pedidos
+        # guarda também os falhanços (imdb_id NULL) para não repetir pedidos até RETRY_DAYS
         db.execute(
-            "INSERT OR REPLACE INTO matches VALUES (?,?,?,?,?)",
-            (title, *(res if res else (None, None, None, None))),
+            "INSERT OR REPLACE INTO matches (title, imdb_id, original, year, runtime, checked) VALUES (?,?,?,?,?,?)",
+            (title, *(res if res else (None, None, None, None)), datetime.now().isoformat()),
         )
         db.commit()
         print(f"[{n}/{len(rows)}] {title} -> {res[0] if res else 'sem correspondência'}")
@@ -352,6 +370,29 @@ def fmt_remaining(delta):
     if h:
         return f"{h}h {m:02d}m"
     return f"{m}m"
+
+
+def history_notice(db, now):
+    """Aviso se o histórico ainda não cobre os CATCHUP_DAYS dias de 'Para gravar'."""
+    first = db.execute("SELECT MIN(start) FROM airings").fetchone()[0]
+    if not first:
+        return None
+    first = datetime.fromisoformat(first)
+    if first <= now - timedelta(days=CATCHUP_DAYS) + timedelta(hours=6):
+        return None
+    return (
+        f"Histórico incompleto: só há dados desde {fmt_when(first)}, por isso &laquo;Para gravar&raquo; "
+        f"ainda não cobre os {CATCHUP_DAYS} dias completos (fica completo a partir de "
+        f"{fmt_when(first + timedelta(days=CATCHUP_DAYS))})."
+    )
+
+
+FOOTER = (
+    "<footer><p>Horários: <a href='https://tudonumclick.com'>tudonumclick.com</a>. "
+    "Ratings: dataset público do IMDb (uso pessoal e não comercial). "
+    "Este produto usa a API do <a href='https://www.themoviedb.org'>TMDB</a>, mas não é endossado nem "
+    "certificado pelo TMDB. Correspondências feitas automaticamente: podem existir erros.</p></footer>"
+)
 
 
 def collect_films(db, now):
@@ -433,9 +474,13 @@ def report(db, now=None):
         "<title>Filmes na TV</title>",
         "<style>body{font-family:system-ui;max-width:760px;margin:1rem auto;padding:0 1rem}"
         "li{margin:.8rem 0}.r{font-weight:700}.y{color:#555}.urgent{color:#b00020;font-weight:600}"
+        ".aviso{background:#fff4d6;padding:.6rem .8rem;border-radius:6px}footer{color:#555;font-size:.85rem;margin:2rem 0}"
         "small{display:block}</style>",
         "<h1>Filmes na TV por rating IMDb</h1>",
     ]
+    notice = history_notice(db, now)
+    if notice:
+        parts.append(f"<p class='aviso'>{notice}</p>")
     counts = {}
     for name, kind, belongs in sections:
         items = []
@@ -452,6 +497,7 @@ def report(db, now=None):
         parts.append("<h2>Sem correspondência</h2><ul>")
         parts += [f"<li>{html.escape(t)}</li>" for (t,) in unmatched]
         parts.append("</ul>")
+    parts.append(FOOTER)
     Path(OUT_PATH).write_text("\n".join(parts), encoding="utf-8")
     print(f"\n{', '.join(f'{n}: {c}' for n, c in counts.items())}; {len(unmatched)} sem correspondência -> {OUT_PATH}")
 
@@ -465,11 +511,12 @@ def main():
         CREATE TABLE IF NOT EXISTS airings(
             channel TEXT, start TEXT, end TEXT, title TEXT, PRIMARY KEY(channel, start));
         CREATE TABLE IF NOT EXISTS matches(
-            title TEXT PRIMARY KEY, imdb_id TEXT, original TEXT, year TEXT, runtime INT);
+            title TEXT PRIMARY KEY, imdb_id TEXT, original TEXT, year TEXT, runtime INT, checked TEXT);
         CREATE TABLE IF NOT EXISTS ratings(
             tconst TEXT PRIMARY KEY, rating REAL, votes INT);
         """
     )
+    migrate(db)
     for channel, slug in discover_slugs().items():
         try:
             scrape_channel(db, channel, slug)
