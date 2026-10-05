@@ -5,6 +5,19 @@ on:
     # 05:00 UTC = 06:00 em Lisboa no verão (WEST) e 05:00 no inverno (WET). O GitHub pode atrasar alguns minutos.
     - cron: "0 5 * * *"
   workflow_dispatch:
+    inputs:
+      so_pagina:
+        description: "Só regenerar a página (sem recolher dados do site)"
+        type: boolean
+        default: false
+  # um push que mexa no visual ou no código atualiza a página, sem recolher nada
+  push:
+    branches: [main]
+    paths:
+      - estilo.css
+      - pagina.js
+      - filmes_tv.py
+      - .github/workflows/atualizar.yml
 
 # uma execução de cada vez, para dois commits de dados não colidirem
 concurrency:
@@ -17,8 +30,13 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      # push e disparo "só página": usa os dados já guardados em data/, sem pedidos ao site nem ao TMDB
+      SO_PAGINA: ${{ github.event_name == 'push' || github.event.inputs.so_pagina == 'true' }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref_name }}   # a ponta do ramo (com os dados mais recentes do bot), não o commit do evento
 
       - uses: actions/setup-python@v5
         with:
@@ -31,12 +49,18 @@ jobs:
         run: python -m unittest discover -s tests
 
       - name: Recolher, identificar e gerar a página
+        if: env.SO_PAGINA != 'true'
         run: python filmes_tv.py
         env:
           TMDB_API_KEY: ${{ secrets.TMDB_API_KEY }}
 
+      - name: Gerar a página a partir dos dados guardados
+        if: env.SO_PAGINA == 'true'
+        run: python filmes_tv.py --relatorio
+
       # só airings e matches (data/*.csv) ficam no repo; o dataset de ratings volta a ser descarregado
       - name: Guardar dados no repositório
+        if: env.SO_PAGINA != 'true'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
