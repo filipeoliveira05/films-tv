@@ -39,6 +39,7 @@ RATINGS_GZ = Path("title.ratings.tsv.gz")
 RATINGS_URL = "https://datasets.imdbws.com/title.ratings.tsv.gz"
 MIN_MINUTES = 75          # abaixo disto não é tratado como filme
 REQUEST_DELAY = 1.0       # segundos entre pedidos ao site
+KEEP_DAYS = 8             # emissões mais antigas já não estão no catch-up (7 dias) e são apagadas
 
 
 def load_dotenv(path=".env"):
@@ -181,6 +182,16 @@ def scrape_channel(db, channel, slug):
         print(f"! {channel}: 0 programas lidos (ajustar parse_programs?)", file=sys.stderr)
     else:
         print(f"{channel}: {total} programas em {len(pages)} dias")
+
+
+def prune(db):
+    """Apaga emissões com início há mais de KEEP_DAYS dias. Os matches ficam (são pequenos e reaproveitados)."""
+    limit = (datetime.now() - timedelta(days=KEEP_DAYS)).isoformat()
+    n = db.execute("DELETE FROM airings WHERE start < ?", (limit,)).rowcount
+    db.commit()
+    if n:
+        print(f"Podadas {n} emissões com mais de {KEEP_DAYS} dias")
+    return n
 
 
 # ---------------------------------------------------------------- ratings IMDb
@@ -408,6 +419,7 @@ def main():
             scrape_channel(db, channel, slug)
         except requests.RequestException as e:
             print(f"! {channel}: {e}", file=sys.stderr)
+    prune(db)
     load_ratings(db)
     match_titles(db)
     report(db)

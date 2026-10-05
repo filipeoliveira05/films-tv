@@ -112,7 +112,7 @@ O Cinemundo foi retirado de propósito. Não voltar a acrescentar.
 5. Avaliar a qualidade do matching numa amostra real; ajustar a tolerância de duração e normalizar títulos (acentos/apóstrofos estranhos, sufixos como "- O Filme") se necessário.
 6. Permitir repetir os falhanços de matching ao fim de algum tempo (hoje ficam para sempre como NULL).
 7. Dividir o relatório em duas secções, ambas ordenadas por rating: "Para gravar" (já passaram nos últimos 7 dias, com indicação de quando deixam de estar disponíveis) e "A vir" (início no futuro). Tratar à parte o que está a dar neste momento.
-8. Podar `airings` com mais de cerca de 8 dias, para a base de dados ficar pequena.
+8. ~~Podar `airings` com mais de ~8 dias~~ — feito (`prune`, `KEEP_DAYS` = 8, chamada em `main()` depois do scraping; os `matches` não são podados).
 9. Criar o repositório no GitHub, o workflow (cron diário + `workflow_dispatch`), o passo que guarda `airings`/`matches` entre execuções e o deploy para o GitHub Pages.
 10. Avisar na página quando a janela de 7 dias ainda estiver incompleta (primeira semana).
 11. Opcional: filtro de votos mínimos (para evitar notas altas com poucos votos), filtros por canal/rating na página.
