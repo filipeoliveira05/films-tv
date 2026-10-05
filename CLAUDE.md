@@ -46,7 +46,7 @@ Achados do HTML real: cada programa é um `div.channel_data` com a hora em `<b>H
 2. **Filtro de filmes**: considera filme qualquer programa com duração >= `MIN_MINUTES` (75). É uma heurística; não há categoria no site.
 3. **Matching TMDB** (`match_title`, `choose`): pesquisa `/search/movie` em `pt-PT` (com `year` se o título trouxer "(2019)"; `(VP)` e `´` são normalizados; episódios "T12 - Ep. 3" são ignorados). Só vê detalhes de resultados cujo título (pt-PT ou original) seja parecido (`similarity` >= 0.85, ignorando acentos/maiúsculas; o prefixo antes de " - " ou ": " vale um pouco menos). Duração do slot vs. filme com tolerância assimétrica (slot pode ser até 60 min mais longo por publicidade, ou 25 mais curto); desempata por semelhança e depois por duração. Recurso: sem título parecido, aceita o 1.º resultado se tiver >= 1500 votos e duração a ±15 min (ex.: "Duna" vs "Dune: Parte Um"). Os falhanços ficam em `matches` com `imdb_id` NULL.
 4. **Ratings**: descarrega `title.ratings.tsv.gz` de datasets.imdbws.com (refresca se tiver mais de 7 dias) para a tabela `ratings`; o join é local.
-5. **Relatório** (`report`): gera `filmes.html` ordenado por rating (sem rating no fim), com os horários por canal (passados a cinzento) e uma secção "Sem correspondência".
+5. **Relatório** (`collect_films`, `report`): gera `filmes.html` com um filme por `imdb_id` (junta `(VP)` e variantes de maiúsculas) e três secções, todas ordenadas por rating (sem rating no fim): "A dar agora" (só se houver), "Para gravar" (emissões já terminadas nos últimos 7 dias, com "até <data> (faltam X)", a vermelho se faltar menos de 1 dia; prazo = início + 7 dias, **suposição não verificada** sobre como a NOS conta) e "A vir" (início no futuro). Um filme pode estar em "Para gravar" e "A vir", cada um só com as suas emissões. Termina com "Sem correspondência".
 
 ## Ficheiros
 
@@ -111,7 +111,7 @@ O Cinemundo foi retirado de propósito. Não voltar a acrescentar.
 4. Verificar `robots.txt` e termos do site.
 5. Avaliar a qualidade do matching numa amostra real; ajustar a tolerância de duração e normalizar títulos (acentos/apóstrofos estranhos, sufixos como "- O Filme") se necessário.
 6. Permitir repetir os falhanços de matching ao fim de algum tempo (hoje ficam para sempre como NULL).
-7. Dividir o relatório em duas secções, ambas ordenadas por rating: "Para gravar" (já passaram nos últimos 7 dias, com indicação de quando deixam de estar disponíveis) e "A vir" (início no futuro). Tratar à parte o que está a dar neste momento.
+7. ~~Dividir o relatório em duas secções~~ — feito (ver "Relatório" acima).
 8. ~~Podar `airings` com mais de ~8 dias~~ — feito (`prune`, `KEEP_DAYS` = 8, chamada em `main()` depois do scraping; os `matches` não são podados).
 9. Criar o repositório no GitHub, o workflow (cron diário + `workflow_dispatch`), o passo que guarda `airings`/`matches` entre execuções e o deploy para o GitHub Pages.
 10. Avisar na página quando a janela de 7 dias ainda estiver incompleta (primeira semana).

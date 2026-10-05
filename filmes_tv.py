@@ -335,10 +335,29 @@ def match_titles(db):
 
 
 # ---------------------------------------------------------------- relatório
-def report(db):
-    since = (datetime.now() - timedelta(days=7)).isoformat()
-    now = datetime.now().isoformat()
-    # um filme por imdb_id: junta a versão dobrada '(VP)' e variantes de maiúsculas do mesmo título
+DIAS = ["seg", "ter", "qua", "qui", "sex", "sáb", "dom"]
+CATCHUP_DAYS = 7          # a NOS TV deixa ver o que passou nos últimos 7 dias
+
+
+def fmt_when(dt):
+    return f"{DIAS[dt.weekday()]} {dt:%d/%m %H:%M}"
+
+
+def fmt_remaining(delta):
+    mins = int(delta.total_seconds() // 60)
+    d, rest = divmod(mins, 1440)
+    h, m = divmod(rest, 60)
+    if d:
+        return f"{d}d {h}h"
+    if h:
+        return f"{h}h {m:02d}m"
+    return f"{m}m"
+
+
+def collect_films(db, now):
+    """Filmes (um por imdb_id, ordenados por rating) com as emissões desde há CATCHUP_DAYS dias."""
+    since = (now - timedelta(days=CATCHUP_DAYS)).isoformat()
+    # junta a versão dobrada '(VP)' e variantes de maiúsculas do mesmo título
     rows = db.execute(
         """SELECT m.imdb_id, MIN(m.original), MIN(m.year), r.rating, r.votes, GROUP_CONCAT(m.title, char(31))
            FROM matches m LEFT JOIN ratings r ON r.tconst = m.imdb_id
@@ -351,9 +370,54 @@ def report(db):
     films = []
     for imdb, original, year, rating, votes, titles in rows:
         titles = titles.split("\x1f")
-        # título a mostrar: o que não é versão dobrada
+        # título a mostrar: o que não é versão dobrada, sem o sufixo
         title = VP_RE.sub("", sorted(titles, key=lambda t: (bool(VP_RE.search(t)), t))[0])
-        films.append((title, titles, original, year, rating, votes, imdb))
+        airings = [
+            (c, datetime.fromisoformat(s), datetime.fromisoformat(e), bool(VP_RE.search(t)))
+            for c, s, e, t in db.execute(
+                f"SELECT channel, start, end, title FROM airings WHERE title IN ({','.join('?' * len(titles))}) "
+                "AND start >= ? ORDER BY start",
+                (*titles, since),
+            )
+        ]
+        films.append(dict(title=title, original=original, year=year, rating=rating, votes=votes,
+                          imdb=imdb, airings=airings))
+    return films
+
+
+def film_item(f, airings, kind, now):
+    lines = []
+    for channel, start, end, vp in airings:
+        label = f"{html.escape(channel)}{' (VP)' if vp else ''} {fmt_when(start)}"
+        cls = ""
+        if kind == "gravar":
+            expires = start + timedelta(days=CATCHUP_DAYS)
+            left = expires - now
+            label += f" &middot; até {fmt_when(expires)} (faltam {fmt_remaining(left)})"
+            if left < timedelta(days=1):
+                cls = " class='urgent'"
+        elif kind == "agora":
+            label += f" &middot; termina às {end:%H:%M}"
+        lines.append(f"<span{cls}>{label}</span>")
+    rtxt = f"{f['rating']:.1f} ({f['votes']:,} votos)" if f["rating"] else "sem rating"
+    year_txt = f" <span class='y'>({f['year']})</span>" if f["year"] else ""
+    return (
+        f"<li><span class='r'>{rtxt}</span> &middot; "
+        f"<a href='https://www.imdb.com/title/{f['imdb']}/'>{html.escape(f['title'])}</a>{year_txt} "
+        f"<small>{html.escape(f['original'] or '')}</small><small>{'<br>'.join(lines)}</small></li>"
+    )
+
+
+def report(db, now=None):
+    now = now or datetime.now()
+    since = (now - timedelta(days=CATCHUP_DAYS)).isoformat()
+    films = collect_films(db, now)
+    # cada filme entra em cada secção só com as emissões que lhe pertencem
+    sections = [
+        ("A dar agora", "agora", lambda s, e: s <= now < e),
+        ("Para gravar", "gravar", lambda s, e: e <= now),
+        ("A vir", "vir", lambda s, e: s > now),
+    ]
     unmatched = db.execute(
         """SELECT DISTINCT a.title FROM airings a
            LEFT JOIN matches m ON m.title = a.title
@@ -368,36 +432,28 @@ def report(db):
         "<!doctype html><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'>",
         "<title>Filmes na TV</title>",
         "<style>body{font-family:system-ui;max-width:760px;margin:1rem auto;padding:0 1rem}"
-        "li{margin:.8rem 0}.r{font-weight:700}.y{color:#555}.past{color:#888}small{display:block}</style>",
-        "<h1>Filmes na TV por rating IMDb</h1><ol>",
+        "li{margin:.8rem 0}.r{font-weight:700}.y{color:#555}.urgent{color:#b00020;font-weight:600}"
+        "small{display:block}</style>",
+        "<h1>Filmes na TV por rating IMDb</h1>",
     ]
-    for title, titles, original, year, rating, votes, imdb in films:
-        airings = db.execute(
-            f"SELECT channel, start, title FROM airings WHERE title IN ({','.join('?' * len(titles))}) "
-            "AND start >= ? ORDER BY start",
-            (*titles, since),
-        ).fetchall()
-        when = "; ".join(
-            f"<span class='{'past' if s < now else ''}'>{html.escape(c)}{' (VP)' if VP_RE.search(t) else ''} "
-            f"{datetime.fromisoformat(s):%a %d/%m %H:%M}</span>"
-            for c, s, t in airings
-        )
-        year_txt = f" <span class='y'>({year})</span>" if year else ""
-        rtxt = f"{rating:.1f} ({votes:,} votos)" if rating else "sem rating"
-        parts.append(
-            f"<li><span class='r'>{rtxt}</span> &middot; "
-            f"<a href='https://www.imdb.com/title/{imdb}/'>{html.escape(title)}</a>{year_txt} "
-            f"<small>{html.escape(original or '')}</small><small>{when}</small></li>"
-        )
-    parts.append("</ol>")
+    counts = {}
+    for name, kind, belongs in sections:
+        items = []
+        for f in films:
+            mine = [a for a in f["airings"] if belongs(a[1], a[2])]
+            if mine:
+                items.append(film_item(f, mine, kind, now))
+        counts[name] = len(items)
+        if not items and kind == "agora":
+            continue   # só mostra "A dar agora" se houver algo
+        parts.append(f"<h2>{name}</h2>")
+        parts.append("<ol>" + "\n".join(items) + "</ol>" if items else "<p>Nada de momento.</p>")
     if unmatched:
         parts.append("<h2>Sem correspondência</h2><ul>")
         parts += [f"<li>{html.escape(t)}</li>" for (t,) in unmatched]
         parts.append("</ul>")
     Path(OUT_PATH).write_text("\n".join(parts), encoding="utf-8")
-    print(f"\n{len(films)} filmes, {len(unmatched)} sem correspondência -> {OUT_PATH}")
-    for title, _, _, _, rating, _, _ in films[:10]:
-        print(f"  {rating or '-':>4}  {title}")
+    print(f"\n{', '.join(f'{n}: {c}' for n, c in counts.items())}; {len(unmatched)} sem correspondência -> {OUT_PATH}")
 
 
 def main():
