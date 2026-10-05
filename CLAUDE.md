@@ -21,8 +21,8 @@ Limitação a ter presente: a página mostra o que passou na grelha, não o que 
 - GitHub Actions com execução **diária** (cron) mais disparo manual. Semanal não serve: deixaria buracos, porque o site só mostra poucos dias.
 - Resultado final: página no **GitHub Pages** (`filmes.html`), aberta no telemóvel através de um marcador.
 - `TMDB_API_KEY` guardada como *secret* do repositório, nunca no código.
-- Persistência entre execuções (o Actions começa sempre do zero): guardar no repo só `airings` e `matches` (pequenos, com poda de programas com mais de ~8 dias). O dataset de ratings do IMDb não se guarda; volta a ser descarregado em cada execução (~8 MB comprimidos).
-- Por testar: se o tudonumclick.com aceita pedidos vindos dos servidores do GitHub.
+- Persistência entre execuções (decidido: no repo): `data/airings.csv` e `data/matches.csv` (ordenados, gerados por `export_state`, lidos por `import_state`); o Actions faz commit deles. O dataset de ratings do IMDb não se guarda; volta a ser descarregado em cada execução (~8 MB comprimidos). Decisão A sobre os termos do site: repo e página públicos com a grelha, assumido pelo utilizador.
+- Cron diário às 05:00 UTC (06:00 Lisboa no verão, 05:00 no inverno), em `.github/workflows/atualizar.yml`. Por testar: se o tudonumclick.com aceita pedidos vindos dos servidores do GitHub (se nenhum canal for lido, o script falha de propósito em vez de publicar dados antigos).
 
 ## Estado atual
 
@@ -110,11 +110,11 @@ O Cinemundo foi retirado de propósito. Não voltar a acrescentar.
 3. Confirmar o ponto das datas ("Hoje" do site vs. data local).
 4. Verificar `robots.txt` e termos do site.
 5. Avaliar a qualidade do matching numa amostra real; ajustar a tolerância de duração e normalizar títulos (acentos/apóstrofos estranhos, sufixos como "- O Filme") se necessário.
-6. Permitir repetir os falhanços de matching ao fim de algum tempo (hoje ficam para sempre como NULL).
+6. ~~Repetir falhanços de matching~~ — feito (`RETRY_DAYS` = 30, coluna `matches.checked`).
 7. ~~Dividir o relatório em duas secções~~ — feito (ver "Relatório" acima).
 8. ~~Podar `airings` com mais de ~8 dias~~ — feito (`prune`, `KEEP_DAYS` = 8, chamada em `main()` depois do scraping; os `matches` não são podados).
-9. Criar o repositório no GitHub, o workflow (cron diário + `workflow_dispatch`), o passo que guarda `airings`/`matches` entre execuções e o deploy para o GitHub Pages.
-10. Avisar na página quando a janela de 7 dias ainda estiver incompleta (primeira semana).
+9. Workflow criado e commitado **mas nunca executado** (nem validado fora do YAML). Falta, a cargo do utilizador: secret `TMDB_API_KEY`, Settings > Pages > Source = GitHub Actions, Settings > Actions > Workflow permissions = leitura e escrita, e o push. Versões das actions (checkout v4, setup-python v5, upload-pages-artifact v3, deploy-pages v4) a rever na primeira execução.
+10. ~~Avisar quando a janela de 7 dias está incompleta~~ — feito (`history_notice`).
 11. Opcional: filtro de votos mínimos (para evitar notas altas com poucos votos), filtros por canal/rating na página.
 
 ## Convenções
