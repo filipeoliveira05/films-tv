@@ -16,6 +16,7 @@ Uso:
 
 Correr todos os dias acumula histórico na base de dados (dias passados).
 """
+import csv
 import gzip
 import html
 import os
@@ -39,6 +40,7 @@ RATINGS_GZ = Path("title.ratings.tsv.gz")
 RATINGS_URL = "https://datasets.imdbws.com/title.ratings.tsv.gz"
 MIN_MINUTES = 75          # abaixo disto não é tratado como filme
 REQUEST_DELAY = 1.0       # segundos entre pedidos ao site
+STATE_DIR = Path("data")  # airings.csv e matches.csv: o que é guardado no repo entre execuções
 KEEP_DAYS = 8             # emissões mais antigas já não estão no catch-up (7 dias) e são apagadas
 
 
@@ -182,6 +184,41 @@ def scrape_channel(db, channel, slug):
         print(f"! {channel}: 0 programas lidos (ajustar parse_programs?)", file=sys.stderr)
     else:
         print(f"{channel}: {total} programas em {len(pages)} dias")
+    return total
+
+
+STATE_TABLES = {
+    "airings": (["channel", "start", "end", "title"], "channel, start"),
+    "matches": (["title", "imdb_id", "original", "year", "runtime", "checked"], "title"),
+}
+
+
+def export_state(db, directory=STATE_DIR):
+    """Grava airings e matches em CSV ordenado (diffs pequenos). Os ratings do IMDb não se guardam."""
+    directory = Path(directory)
+    directory.mkdir(parents=True, exist_ok=True)
+    for table, (cols, order) in STATE_TABLES.items():
+        with open(directory / f"{table}.csv", "w", encoding="utf-8", newline="") as f:
+            w = csv.writer(f, lineterminator="\n")
+            w.writerow(cols)
+            w.writerows(db.execute(f"SELECT {', '.join(cols)} FROM {table} ORDER BY {order}"))
+
+
+def import_state(db, directory=STATE_DIR):
+    """Carrega os CSV para a base de dados sem sobrepor o que já lá está."""
+    for table, (cols, _) in STATE_TABLES.items():
+        path = Path(directory) / f"{table}.csv"
+        if not path.exists():
+            continue
+        with open(path, encoding="utf-8", newline="") as f:
+            for row in csv.DictReader(f):
+                values = [row.get(c) or None for c in cols]   # '' -> NULL
+                if table == "matches" and values[4] is not None:
+                    values[4] = int(values[4])
+                db.execute(
+                    f"INSERT OR IGNORE INTO {table} ({', '.join(cols)}) VALUES ({','.join('?' * len(cols))})", values
+                )
+    db.commit()
 
 
 def prune(db):
@@ -517,15 +554,21 @@ def main():
         """
     )
     migrate(db)
+    import_state(db)
+    read = 0
     for channel, slug in discover_slugs().items():
         try:
-            scrape_channel(db, channel, slug)
+            read += bool(scrape_channel(db, channel, slug))
         except requests.RequestException as e:
             print(f"! {channel}: {e}", file=sys.stderr)
+    if not read:
+        # sem isto, uma falha total do site (ex.: bloqueio) publicaria uma página desatualizada sem avisar
+        sys.exit("Nenhum canal foi lido do tudonumclick.com; nada foi atualizado.")
     prune(db)
     load_ratings(db)
     match_titles(db)
     report(db)
+    export_state(db)
 
 
 if __name__ == "__main__":
