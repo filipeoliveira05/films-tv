@@ -62,7 +62,7 @@ class RelatorioLocalTest(unittest.TestCase):
         h = self.out.read_text(encoding="utf-8")
         self.assertEqual(self.chamadas, ["ratings"])
         self.assertIn(">Duna</a>", h)
-        self.assertIn("<b>8,0</b>", h)
+        self.assertIn("<b>8.0</b>", h)
 
     def test_mostra_a_hora_da_ultima_recolha_e_nao_a_da_geracao(self):
         relatorio_local(sqlite3.connect(":memory:"), self.dir)

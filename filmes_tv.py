@@ -516,7 +516,7 @@ def collect_films(db, now):
 
 
 def fmt_rating(r):
-    return f"{r:.1f}".replace(".", ",")
+    return f"{r:.1f}"
 
 
 def fmt_votes(v):

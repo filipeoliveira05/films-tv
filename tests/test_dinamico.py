@@ -59,7 +59,7 @@ class ContratoTest(unittest.TestCase):
     def test_filmes_com_id_e_ordem_por_rating(self):
         m = re.findall(r"<li class='film' data-film='(tt\d)' data-rank='(\d+)'>", self.html)
         ranks = {i: int(r) for i, r in m}
-        self.assertLess(ranks["tt2"], ranks["tt1"])      # Beta (8,0) vem antes de Alfa (7,0)
+        self.assertLess(ranks["tt2"], ranks["tt1"])      # Beta (8.0) vem antes de Alfa (7.0)
 
     def test_a_dar_agora_existe_mas_escondida_quando_vazia(self):
         self.assertIn("<section id='agora' class='s-agora' aria-labelledby='h-agora' hidden>", self.html)

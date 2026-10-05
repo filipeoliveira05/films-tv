@@ -10,9 +10,9 @@ from filmes_tv import fmt_rating, fmt_votes, rating_tier, remaining_pct
 
 
 class FormatosTest(unittest.TestCase):
-    def test_rating_com_virgula(self):
-        self.assertEqual(fmt_rating(9.3), "9,3")
-        self.assertEqual(fmt_rating(7.0), "7,0")
+    def test_rating_com_ponto(self):
+        self.assertEqual(fmt_rating(9.3), "9.3")
+        self.assertEqual(fmt_rating(7.0), "7.0")
 
     def test_votos_compactos(self):
         self.assertEqual(fmt_votes(3247765), "3,2 M votos")
@@ -75,7 +75,7 @@ class PaginaTest(unittest.TestCase):
         self.assertIn("id='vir'", self.html)
 
     def test_rating_votos_e_escalao(self):
-        self.assertIn("<div class='score hi'><b>8,0</b><small>812 votos</small></div>", self.html)
+        self.assertIn("<div class='score hi'><b>8.0</b><small>812 votos</small></div>", self.html)
 
     def test_sem_correspondencia_recolhida(self):
         self.assertIn("<details>", self.html)
