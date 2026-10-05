@@ -2,3 +2,4 @@ filmes.db
 title.ratings.tsv.gz
 filmes.html
 __pycache__/
+*:Zone.Identifier
