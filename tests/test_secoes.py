@@ -65,7 +65,7 @@ class SeccoesTest(unittest.TestCase):
         html_ = self.out.read_text(encoding="utf-8")
         self.sec = {}
         for part in html_.split("<h2")[1:]:
-            name = re.match(r"[^>]*>([^<]+)</h2>", part).group(1)
+            name = re.search(r"<span class='name'>([^<]+)</span>", part).group(1)
             self.sec[name] = part
 
     def titulos(self, secao):
@@ -92,14 +92,21 @@ class SeccoesTest(unittest.TestCase):
         self.assertIn("qua 07/10", self.sec["A vir"])
         self.assertNotIn("sex 02/10", self.sec["A vir"])
 
+    def test_a_dar_agora_mostra_a_hora_de_fim(self):
+        self.assertIn("termina às 13:00", self.sec["A dar agora"])
+
+    def test_a_vir_mostra_quanto_falta(self):
+        self.assertIn("em 2d 9h", self.sec["A vir"])      # Alfa: qua 07/10 21:00, agora seg 05/10 12:00
+
     def test_prazo_de_disponibilidade(self):
         # Alfa passou sex 02/10 20:00 -> até sex 09/10 20:00, faltam 4d 8h
-        self.assertIn("até sex 09/10 20:00 (faltam 4d 8h)", self.sec["Para gravar"])
+        self.assertIn("faltam 4d 8h", self.sec["Para gravar"])
+        self.assertIn("até sex 09/10 20:00", self.sec["Para gravar"])
 
     def test_urgente_quando_falta_menos_de_um_dia(self):
         # Zeta passou 28/09 12:30 -> expira 05/10 12:30, faltam 30 min
-        self.assertIn("<span class='urgent'>AMC seg 28/09", self.sec["Para gravar"])
-        self.assertNotIn("<span class='urgent'>AXN sex 02/10", self.sec["Para gravar"])
+        self.assertIn("<li class='airing urgent'><span class='where'><b>AMC</b> seg 28/09", self.sec["Para gravar"])
+        self.assertNotIn("<li class='airing urgent'><span class='where'><b>AXN</b> sex 02/10", self.sec["Para gravar"])
         self.assertIn("faltam 30m", self.sec["Para gravar"])
 
 

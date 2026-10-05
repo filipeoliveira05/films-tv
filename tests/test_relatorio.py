@@ -52,7 +52,7 @@ class RelatorioTest(unittest.TestCase):
         filmes_tv.OUT_PATH = self._old
 
     def test_junta_vp_e_variantes_de_maiusculas(self):
-        self.assertEqual(self.html.count("<li><span class='r'>"), 4)
+        self.assertEqual(self.html.count("<li class='film'>"), 4)
 
     def test_titulo_sem_vp_e_horarios_juntos(self):
         self.assertIn(">Mínimos</a>", self.html)

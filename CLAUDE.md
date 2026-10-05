@@ -40,6 +40,12 @@ Achados do HTML real: cada programa é um `div.channel_data` com a hora em `<b>H
 
 **Termos do site** (`/termos-e-condicoes/`, 2020): a secção "Cópia de conteúdos" proíbe reproduzir/distribuir a informação sem autorização. Uso pessoal a baixo ritmo parece compatível, mas publicar a grelha no GitHub Pages / `airings` num repo público é uma zona cinzenta. Decisão do utilizador (2026-10-05): seguir com repo e página públicos (opção A), assumindo esse risco.
 
+## Design da página
+
+Conceito: o menu no ecrã (OSD) de um gravador: fundo azul de "sem sinal", texto branco, ponto vermelho de REC, verde de PLAY. Cada cor tem um só significado (vermelho = gravar/urgente, verde = a dar agora, ouro = rating >= 8). Tipo: Archivo variável (Google Fonts, eixo de largura: condensado nos títulos, expandido nos ratings). Elemento central: a "fita", barra por emissão que mostra a fração da janela de 7 dias que ainda resta (vermelha se faltar menos de 1 dia). Sem JavaScript. Pensado primeiro para telemóvel; "Sem correspondência" vem recolhida. Para ver alterações, gerar a página e fotografá-la com o Chromium headless do Playwright (`~/.cache/ms-playwright`).
+
+**Problema conhecido:** a página é estática, gerada uma vez por dia (06:00). "A dar agora", "Para gravar", "A vir" e os "faltam…" ficam congelados nessa hora até à execução seguinte. Por resolver (opções: JavaScript que recalcula no browser a partir de datas absolutas; ou regenerar a página várias vezes por dia sem repetir o scraping).
+
 ## Como funciona
 
 1. **Scraping** (`discover_slugs`, `scrape_channel`, `parse_programs`): para cada canal pede `/programacao-tv/<slug>/` e depois cada dia listado na navegação da página (`/<slug>/<dia>/`). O parser não usa seletores CSS: lê o texto da página e procura linhas `HH:MM às HH:MM` seguidas do título. Guarda em `airings(channel, start, end, title)` com `INSERT OR IGNORE`, por isso correr várias vezes acumula histórico.
@@ -51,6 +57,9 @@ Achados do HTML real: cada programa é um `div.channel_data` com a hora em `<b>H
 ## Ficheiros
 
 - `filmes_tv.py`: todo o código.
+- `estilo.css`: o estilo da página; é embutido em `filmes.html` pelo `report` (a página continua num só ficheiro).
+- `tests/`: testes (`python -m unittest discover -s tests`).
+- `data/`: `airings.csv` e `matches.csv`, o estado guardado no repo.
 - `filmes.db`: SQLite (tabelas `airings`, `matches`, `ratings`). Gerado.
 - `title.ratings.tsv.gz`: cache do dataset IMDb. Gerado.
 - `filmes.html`: resultado. Gerado.

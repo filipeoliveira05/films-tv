@@ -1,0 +1,304 @@
+/* Menu no ecrã de um gravador: fundo azul de "sem sinal", texto branco.
+   Cada cor tem um só significado: vermelho = gravar/urgente, verde = a dar agora, ouro = rating >= 8. */
+:root {
+  --screen: #17278f;
+  --deep: #0f1b6b;
+  --ink: #f3f5ff;
+  --dim: #a8b3ee;
+  --line: rgba(243, 245, 255, 0.16);
+  --rec: #ff4a4a;
+  --rec-ink: #ffa3a0;
+  --play: #6bf0a8;
+  --gold: #ffe066;
+  --pad: 1.1rem;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+
+html {
+  scroll-padding-top: 3.4rem;
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--screen);
+  color: var(--ink);
+  font: 400 1rem/1.4 "Archivo", system-ui, sans-serif;
+}
+
+.wrap {
+  max-width: 42rem;
+  margin: 0 auto;
+  padding: 0 var(--pad);
+}
+
+a:focus-visible, summary:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 3px;
+}
+
+/* ---- cabeçalho ---- */
+.top { padding: 2.4rem 0 1.5rem; }
+
+h1 {
+  margin: 0;
+  font-size: clamp(3.4rem, 17vw, 6rem);
+  font-weight: 800;
+  font-stretch: 62%;
+  line-height: 0.86;
+  letter-spacing: -0.01em;
+  word-spacing: 0.14em;
+}
+
+.top p { margin: 0.8rem 0 0; color: var(--dim); }
+.top .stamp { margin-top: 0.15rem; font-size: 0.9rem; }
+
+/* ---- navegação fixa ---- */
+.jump {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  background: var(--deep);
+  border-bottom: 1px solid var(--line);
+}
+
+.jump .wrap {
+  display: flex;
+  gap: 0.2rem;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.jump a {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.85rem 0.6rem;
+  color: var(--ink);
+  font-size: 0.88rem;
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.jump a:first-child { margin-left: -0.6rem; }
+.jump a:hover, .jump a:focus-visible { background: rgba(255, 255, 255, 0.08); }
+.jump b { color: var(--dim); font-weight: 500; font-variant-numeric: tabular-nums; }
+.jump svg, h2 svg { width: 0.85em; height: 0.85em; flex: none; fill: currentColor; }
+
+/* ---- aviso ---- */
+.aviso {
+  margin: 1.6rem 0 0;
+  padding: 0.8rem 1rem;
+  background: var(--deep);
+  border-left: 4px solid var(--gold);
+  font-size: 0.9rem;
+}
+
+/* ---- secções ---- */
+section { padding-top: 2.6rem; }
+
+h2 {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin: 0;
+  font-size: 1.75rem;
+  font-weight: 750;
+  font-stretch: 80%;
+  line-height: 1;
+  word-spacing: 0.12em;
+}
+
+h2 .count {
+  margin-left: auto;
+  color: var(--dim);
+  font-size: 1rem;
+  font-weight: 500;
+  font-stretch: 100%;
+  font-variant-numeric: tabular-nums;
+}
+
+.intro { margin: 0.55rem 0 0; max-width: 34rem; color: var(--dim); font-size: 0.9rem; }
+
+.s-agora h2 svg { color: var(--play); }
+.s-gravar h2 svg { color: var(--rec); }
+.jump .i-agora { color: var(--play); }
+.jump .i-gravar { color: var(--rec); }
+
+/* ---- filmes ---- */
+.films {
+  list-style: none;
+  margin: 1.1rem 0 0;
+  padding: 0;
+  border-top: 1px solid var(--line);
+}
+
+.film {
+  display: grid;
+  grid-template-columns: 4.3rem 1fr;
+  gap: 0 0.8rem;
+  padding: 1.05rem 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.score b {
+  display: block;
+  font-size: 2rem;
+  font-weight: 800;
+  font-stretch: 125%;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums lining-nums;
+}
+
+.score small {
+  display: block;
+  margin-top: 0.3rem;
+  color: var(--dim);
+  font-size: 0.7rem;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.score.hi b { color: var(--gold); }
+.score.lo b, .score.none b { color: var(--dim); }
+.score.none b { font-weight: 400; }
+
+h3 {
+  margin: 0;
+  font-size: 1.12rem;
+  font-weight: 650;
+  line-height: 1.22;
+  text-wrap: balance;
+}
+
+h3 a {
+  color: inherit;
+  text-decoration-color: rgba(243, 245, 255, 0.35);
+  text-underline-offset: 0.18em;
+}
+
+h3 a:hover { text-decoration-color: currentColor; }
+.y { color: var(--dim); font-weight: 400; }
+.orig { margin: 0.15rem 0 0; color: var(--dim); font-size: 0.85rem; }
+
+/* ---- emissões ---- */
+.airings {
+  display: grid;
+  gap: 0.7rem;
+  margin: 0.7rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.airing {
+  display: grid;
+  gap: 0.3rem;
+  font-size: 0.9rem;
+}
+
+.where b { font-weight: 650; }
+
+.left {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.s-agora .left { color: var(--play); }
+.s-vir .left { color: var(--dim); font-weight: 500; }
+.urgent .left { color: var(--rec-ink); }
+.bar .left { min-width: 6.2rem; text-align: right; }
+
+/* a "fita": fração da janela de 7 dias que ainda resta */
+.bar {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+}
+
+.track {
+  flex: 1;
+  height: 5px;
+  background: rgba(255, 255, 255, 0.14);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.track i {
+  display: block;
+  height: 100%;
+  background: var(--ink);
+  border-radius: 3px;
+}
+
+.urgent .track i { background: var(--rec); }
+.until { display: none; min-width: 8.6rem; color: var(--dim); font-size: 0.75rem; text-align: right; white-space: nowrap; }
+
+/* ---- sem correspondência ---- */
+details { margin-top: 2.8rem; border-top: 1px solid var(--line); }
+
+summary {
+  display: flex;
+  align-items: center;
+  padding: 1.1rem 0;
+  cursor: pointer;
+  list-style: none;
+}
+
+summary::-webkit-details-marker { display: none; }
+summary h2 { flex: 1; font-size: 1.25rem; }
+
+summary::after {
+  content: "";
+  width: 0.55rem;
+  height: 0.55rem;
+  margin: 0 0.3rem 0.25rem 0.8rem;
+  border: solid var(--dim);
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+  transition: transform 0.15s;
+}
+
+details[open] summary::after { transform: rotate(-135deg); margin-bottom: 0; }
+
+details ul {
+  columns: 2 14rem;
+  margin: 0;
+  padding: 0 0 1rem 1.1rem;
+  color: var(--dim);
+  font-size: 0.9rem;
+}
+
+details li { margin: 0 0 0.35rem; break-inside: avoid; }
+
+/* ---- rodapé ---- */
+footer {
+  margin-top: 3rem;
+  padding: 1.4rem 0 3.2rem;
+  border-top: 1px solid var(--line);
+  color: var(--dim);
+  font-size: 0.8rem;
+}
+
+footer p { margin: 0; max-width: 34rem; }
+footer a { color: inherit; }
+
+/* ---- movimento: o ponto REC pisca umas vezes ao abrir e fica fixo ---- */
+@media (prefers-reduced-motion: no-preference) {
+  .s-gravar h2 svg { animation: rec 1.6s steps(1, end) 5; }
+}
+
+@keyframes rec { 50% { opacity: 0.2; } }
+
+/* ---- ecrãs maiores ---- */
+@media (min-width: 48rem) {
+  .film { grid-template-columns: 4.6rem 1fr; gap: 0 1.2rem; }
+  .score b { font-size: 2.4rem; }
+  h3 { font-size: 1.25rem; }
+  .airing { font-size: 0.95rem; }
+  .until { display: inline; }
+}

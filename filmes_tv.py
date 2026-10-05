@@ -431,10 +431,10 @@ def history_notice(db, now):
 
 
 FOOTER = (
-    "<footer><p>Horários: <a href='https://tudonumclick.com'>tudonumclick.com</a>. "
+    "<footer><div class='wrap'><p>Horários: <a href='https://tudonumclick.com'>tudonumclick.com</a>. "
     "Ratings: dataset público do IMDb (uso pessoal e não comercial). "
     "Este produto usa a API do <a href='https://www.themoviedb.org'>TMDB</a>, mas não é endossado nem "
-    "certificado pelo TMDB. Correspondências feitas automaticamente: podem existir erros.</p></footer>"
+    "certificado pelo TMDB. Correspondências feitas automaticamente: podem existir erros.</p></div></footer>"
 )
 
 
@@ -469,26 +469,72 @@ def collect_films(db, now):
     return films
 
 
+def fmt_rating(r):
+    return f"{r:.1f}".replace(".", ",")
+
+
+def fmt_votes(v):
+    if v >= 999_500:
+        return f"{v / 1e6:.1f} M votos".replace(".", ",")
+    if v >= 1000:
+        return f"{round(v / 1000)} mil votos"
+    return f"{v} votos"
+
+
+def rating_tier(r):
+    """'hi' (>= 8) fica a ouro, 'lo' (< 6) esbatido, 'none' sem rating."""
+    if r is None:
+        return "none"
+    return "hi" if r >= 8.0 else "lo" if r < 6.0 else ""
+
+
+def remaining_pct(left):
+    """Fração da janela de CATCHUP_DAYS que ainda resta, em % (largura da 'fita')."""
+    return round(max(0.0, min(1.0, left / timedelta(days=CATCHUP_DAYS))) * 100, 1)
+
+
+ICONS = {
+    "agora": "<svg viewBox='0 0 12 12' aria-hidden='true'><path d='M2 1l9 5-9 5z'/></svg>",
+    "gravar": "<svg viewBox='0 0 12 12' aria-hidden='true'><circle cx='6' cy='6' r='5'/></svg>",
+    "vir": "<svg viewBox='0 0 12 12' aria-hidden='true'><path d='M0 1l6 5-6 5zM6 1l6 5-6 5z'/></svg>",
+}
+FONTS = "https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,100..900&display=swap"
+
+
 def film_item(f, airings, kind, now):
     lines = []
     for channel, start, end, vp in airings:
-        label = f"{html.escape(channel)}{' (VP)' if vp else ''} {fmt_when(start)}"
-        cls = ""
+        who = f"<b>{html.escape(channel)}{' (VP)' if vp else ''}</b> {fmt_when(start)}"
+        urgent, bar = "", ""
         if kind == "gravar":
             expires = start + timedelta(days=CATCHUP_DAYS)
             left = expires - now
-            label += f" &middot; até {fmt_when(expires)} (faltam {fmt_remaining(left)})"
             if left < timedelta(days=1):
-                cls = " class='urgent'"
+                urgent = " urgent"
+            bar = (
+                f"<span class='bar'><span class='track'><i style='width:{remaining_pct(left)}%'></i></span>"
+                f"<span class='left'>faltam {fmt_remaining(left)}</span>"
+                f"<span class='until'>até {fmt_when(expires)}</span></span>"
+            )
         elif kind == "agora":
-            label += f" &middot; termina às {end:%H:%M}"
-        lines.append(f"<span{cls}>{label}</span>")
-    rtxt = f"{f['rating']:.1f} ({f['votes']:,} votos)" if f["rating"] else "sem rating"
-    year_txt = f" <span class='y'>({f['year']})</span>" if f["year"] else ""
+            bar = f"<span class='left'>termina às {end:%H:%M}</span>"
+        else:
+            bar = f"<span class='left'>em {fmt_remaining(start - now)}</span>"
+        lines.append(f"<li class='airing{urgent}'><span class='where'>{who}</span>{bar}</li>")
+    if f["rating"]:
+        score = (
+            f"<div class='score {rating_tier(f['rating'])}'><b>{fmt_rating(f['rating'])}</b>"
+            f"<small>{fmt_votes(f['votes'])}</small></div>"
+        ).replace("score '", "score'")
+    else:
+        score = "<div class='score none'><b>&ndash;</b><small>sem rating</small></div>"
+    year = f" <span class='y'>({f['year']})</span>" if f["year"] else ""
+    orig = f['original'] or ""
+    orig_html = f"<p class='orig'>{html.escape(orig)}</p>" if orig and norm(orig) != norm(f["title"]) else ""
     return (
-        f"<li><span class='r'>{rtxt}</span> &middot; "
-        f"<a href='https://www.imdb.com/title/{f['imdb']}/'>{html.escape(f['title'])}</a>{year_txt} "
-        f"<small>{html.escape(f['original'] or '')}</small><small>{'<br>'.join(lines)}</small></li>"
+        f"<li class='film'>{score}<div class='info'>"
+        f"<h3><a href='https://www.imdb.com/title/{f['imdb']}/'>{html.escape(f['title'])}</a>{year}</h3>"
+        f"{orig_html}<ul class='airings'>{''.join(lines)}</ul></div></li>"
     )
 
 
@@ -498,9 +544,10 @@ def report(db, now=None):
     films = collect_films(db, now)
     # cada filme entra em cada secção só com as emissões que lhe pertencem
     sections = [
-        ("A dar agora", "agora", lambda s, e: s <= now < e),
-        ("Para gravar", "gravar", lambda s, e: e <= now),
-        ("A vir", "vir", lambda s, e: s > now),
+        ("agora", "A dar agora", lambda s, e: s <= now < e, ""),
+        ("gravar", "Para gravar", lambda s, e: e <= now,
+         f"Passaram nos últimos {CATCHUP_DAYS} dias. O prazo conta {CATCHUP_DAYS} dias desde o início da emissão."),
+        ("vir", "A vir", lambda s, e: s > now, "Ordenados por rating, não por data."),
     ]
     unmatched = db.execute(
         """SELECT DISTINCT a.title FROM airings a
@@ -512,34 +559,60 @@ def report(db, now=None):
     ).fetchall()
     unmatched = [(t,) for (t,) in unmatched if not is_series(t)]
 
-    parts = [
-        "<!doctype html><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'>",
-        "<title>Filmes na TV</title>",
-        "<style>body{font-family:system-ui;max-width:760px;margin:1rem auto;padding:0 1rem}"
-        "li{margin:.8rem 0}.r{font-weight:700}.y{color:#555}.urgent{color:#b00020;font-weight:600}"
-        ".aviso{background:#fff4d6;padding:.6rem .8rem;border-radius:6px}footer{color:#555;font-size:.85rem;margin:2rem 0}"
-        "small{display:block}</style>",
-        "<h1>Filmes na TV por rating IMDb</h1>",
-    ]
-    notice = history_notice(db, now)
-    if notice:
-        parts.append(f"<p class='aviso'>{notice}</p>")
-    counts = {}
-    for name, kind, belongs in sections:
+    built = []   # (id, nome, intro, itens)
+    for sid, name, belongs, intro in sections:
         items = []
         for f in films:
             mine = [a for a in f["airings"] if belongs(a[1], a[2])]
             if mine:
-                items.append(film_item(f, mine, kind, now))
-        counts[name] = len(items)
-        if not items and kind == "agora":
-            continue   # só mostra "A dar agora" se houver algo
-        parts.append(f"<h2>{name}</h2>")
-        parts.append("<ol>" + "\n".join(items) + "</ol>" if items else "<p>Nada de momento.</p>")
+                items.append(film_item(f, mine, sid, now))
+        built.append((sid, name, intro, items))
+    counts = {name: len(items) for _, name, _, items in built}
+    shown = [b for b in built if b[3] or b[0] != "agora"]   # "A dar agora" só se houver algo
+
+    css = Path(__file__).with_name("estilo.css").read_text(encoding="utf-8")
+    parts = [
+        "<!doctype html>",
+        "<html lang='pt'>",
+        "<meta charset='utf-8'>",
+        "<meta name='viewport' content='width=device-width,initial-scale=1'>",
+        "<meta name='theme-color' content='#17278f'>",
+        "<title>Filmes na TV</title>",
+        "<link rel='preconnect' href='https://fonts.googleapis.com'>",
+        "<link rel='preconnect' href='https://fonts.gstatic.com' crossorigin>",
+        f"<link rel='stylesheet' href='{FONTS}'>",
+        f"<style>{css}</style>",
+        "<body>",
+        "<header class='top'><div class='wrap'><h1>Filmes na TV</h1>"
+        f"<p>Ordenados por rating IMDb.</p><p class='stamp'>Atualizado {fmt_when(now)}</p></div></header>",
+        "<nav class='jump' aria-label='Secções'><div class='wrap'>"
+        + "".join(
+            f"<a href='#{sid}'><span class='i-{sid}'>{ICONS[sid]}</span>{name} <b>{len(items)}</b></a>"
+            for sid, name, _, items in shown
+        )
+        + "</div></nav>",
+        "<main class='wrap'>",
+    ]
+    notice = history_notice(db, now)
+    if notice:
+        parts.append(f"<p class='aviso'>{notice}</p>")
+    for sid, name, intro, items in shown:
+        parts.append(
+            f"<section id='{sid}' class='s-{sid}' aria-labelledby='h-{sid}'>"
+            f"<h2 id='h-{sid}'>{ICONS[sid]}<span class='name'>{name}</span><span class='count'>{len(items)}</span></h2>"
+        )
+        if intro:
+            parts.append(f"<p class='intro'>{intro}</p>")
+        parts.append("<ol class='films'>" + "\n".join(items) + "</ol>" if items else "<p class='intro'>Nada de momento.</p>")
+        parts.append("</section>")
     if unmatched:
-        parts.append("<h2>Sem correspondência</h2><ul>")
-        parts += [f"<li>{html.escape(t)}</li>" for (t,) in unmatched]
-        parts.append("</ul>")
+        parts.append(
+            "<details><summary><h2><span class='name'>Sem correspondência</span>"
+            f"<span class='count'>{len(unmatched)}</span></h2></summary><ul>"
+            + "".join(f"<li>{html.escape(t)}</li>" for (t,) in unmatched)
+            + "</ul></details>"
+        )
+    parts.append("</main>")
     parts.append(FOOTER)
     Path(OUT_PATH).write_text("\n".join(parts), encoding="utf-8")
     print(f"\n{', '.join(f'{n}: {c}' for n, c in counts.items())}; {len(unmatched)} sem correspondência -> {OUT_PATH}")
