@@ -29,6 +29,7 @@ from datetime import date, datetime, timedelta
 from datetime import time as dtime
 from difflib import SequenceMatcher
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 import requests
 from bs4 import BeautifulSoup
@@ -83,6 +84,11 @@ KNOWN_SLUGS = {
     "TVCine Emotion": "tvc3",
     "TVCine Action": "tvc4",
 }
+
+def now_lisbon():
+    """Agora em Lisboa, sem fuso: as horas dos programas são locais e o runner do Actions está em UTC."""
+    return datetime.now(ZoneInfo("Europe/Lisbon")).replace(tzinfo=None)
+
 
 session = requests.Session()
 session.headers["User-Agent"] = "filmes-tv-pessoal/0.1"
@@ -151,7 +157,7 @@ def parse_programs(page_html, day):
 
 
 def scrape_channel(db, channel, slug):
-    today = date.today()
+    today = now_lisbon().date()
     first = get(f"{BASE}/programacao-tv/{slug}/")
     pages = [(0, first)]
     soup = BeautifulSoup(first, "html.parser")
@@ -223,7 +229,7 @@ def import_state(db, directory=STATE_DIR):
 
 def prune(db):
     """Apaga emissões com início há mais de KEEP_DAYS dias. Os matches ficam (são pequenos e reaproveitados)."""
-    limit = (datetime.now() - timedelta(days=KEEP_DAYS)).isoformat()
+    limit = (now_lisbon() - timedelta(days=KEEP_DAYS)).isoformat()
     n = db.execute("DELETE FROM airings WHERE start < ?", (limit,)).rowcount
     db.commit()
     if n:
@@ -353,13 +359,13 @@ def migrate(db, now=None):
     cols = [r[1] for r in db.execute("PRAGMA table_info(matches)")]
     if "checked" not in cols:
         db.execute("ALTER TABLE matches ADD COLUMN checked TEXT")
-    db.execute("UPDATE matches SET checked = ? WHERE checked IS NULL", ((now or datetime.now()).isoformat(),))
+    db.execute("UPDATE matches SET checked = ? WHERE checked IS NULL", ((now or now_lisbon()).isoformat(),))
     db.commit()
 
 
 def titles_to_match(db, now=None):
     """Títulos ainda sem match, mais os falhanços verificados há mais de RETRY_DAYS dias."""
-    limit = ((now or datetime.now()) - timedelta(days=RETRY_DAYS)).isoformat()
+    limit = ((now or now_lisbon()) - timedelta(days=RETRY_DAYS)).isoformat()
     rows = db.execute(
         """SELECT title, MAX((julianday(end) - julianday(start)) * 1440) AS mins
            FROM airings
@@ -382,7 +388,7 @@ def match_titles(db):
         # guarda também os falhanços (imdb_id NULL) para não repetir pedidos até RETRY_DAYS
         db.execute(
             "INSERT OR REPLACE INTO matches (title, imdb_id, original, year, runtime, checked) VALUES (?,?,?,?,?,?)",
-            (title, *(res if res else (None, None, None, None)), datetime.now().isoformat()),
+            (title, *(res if res else (None, None, None, None)), now_lisbon().isoformat()),
         )
         db.commit()
         print(f"[{n}/{len(rows)}] {title} -> {res[0] if res else 'sem correspondência'}")
@@ -487,7 +493,7 @@ def film_item(f, airings, kind, now):
 
 
 def report(db, now=None):
-    now = now or datetime.now()
+    now = now or now_lisbon()
     since = (now - timedelta(days=CATCHUP_DAYS)).isoformat()
     films = collect_films(db, now)
     # cada filme entra em cada secção só com as emissões que lhe pertencem
