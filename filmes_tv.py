@@ -327,14 +327,22 @@ def match_titles(db):
 def report(db):
     since = (datetime.now() - timedelta(days=7)).isoformat()
     now = datetime.now().isoformat()
-    films = db.execute(
-        """SELECT m.title, m.original, m.year, r.rating, r.votes, m.imdb_id
+    # um filme por imdb_id: junta a versão dobrada '(VP)' e variantes de maiúsculas do mesmo título
+    rows = db.execute(
+        """SELECT m.imdb_id, MIN(m.original), MIN(m.year), r.rating, r.votes, GROUP_CONCAT(m.title, char(31))
            FROM matches m LEFT JOIN ratings r ON r.tconst = m.imdb_id
            WHERE m.imdb_id IS NOT NULL
              AND EXISTS (SELECT 1 FROM airings a WHERE a.title = m.title AND a.start >= ?)
+           GROUP BY m.imdb_id
            ORDER BY r.rating IS NULL, r.rating DESC""",
         (since,),
     ).fetchall()
+    films = []
+    for imdb, original, year, rating, votes, titles in rows:
+        titles = titles.split("\x1f")
+        # título a mostrar: o que não é versão dobrada
+        title = sorted(titles, key=lambda t: (bool(VP_RE.search(t)), t))[0]
+        films.append((title, titles, original, year, rating, votes, imdb))
     unmatched = db.execute(
         """SELECT DISTINCT a.title FROM airings a
            LEFT JOIN matches m ON m.title = a.title
@@ -349,24 +357,26 @@ def report(db):
         "<!doctype html><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'>",
         "<title>Filmes na TV</title>",
         "<style>body{font-family:system-ui;max-width:760px;margin:1rem auto;padding:0 1rem}"
-        "li{margin:.8rem 0}.r{font-weight:700}.past{color:#888}small{display:block}</style>",
+        "li{margin:.8rem 0}.r{font-weight:700}.y{color:#555}.past{color:#888}small{display:block}</style>",
         "<h1>Filmes na TV por rating IMDb</h1><ol>",
     ]
-    for title, original, year, rating, votes, imdb in films:
+    for title, titles, original, year, rating, votes, imdb in films:
         airings = db.execute(
-            "SELECT channel, start FROM airings WHERE title = ? AND start >= ? ORDER BY start",
-            (title, since),
+            f"SELECT channel, start, title FROM airings WHERE title IN ({','.join('?' * len(titles))}) "
+            "AND start >= ? ORDER BY start",
+            (*titles, since),
         ).fetchall()
         when = "; ".join(
-            f"<span class='{'past' if s < now else ''}'>{html.escape(c)} "
+            f"<span class='{'past' if s < now else ''}'>{html.escape(c)}{' (VP)' if VP_RE.search(t) else ''} "
             f"{datetime.fromisoformat(s):%a %d/%m %H:%M}</span>"
-            for c, s in airings
+            for c, s, t in airings
         )
+        year_txt = f" <span class='y'>({year})</span>" if year else ""
         rtxt = f"{rating:.1f} ({votes:,} votos)" if rating else "sem rating"
         parts.append(
             f"<li><span class='r'>{rtxt}</span> &middot; "
-            f"<a href='https://www.imdb.com/title/{imdb}/'>{html.escape(title)}</a> "
-            f"<small>{html.escape(original or '')} {year or ''}</small><small>{when}</small></li>"
+            f"<a href='https://www.imdb.com/title/{imdb}/'>{html.escape(title)}</a>{year_txt} "
+            f"<small>{html.escape(original or '')}</small><small>{when}</small></li>"
         )
     parts.append("</ol>")
     if unmatched:
@@ -375,7 +385,7 @@ def report(db):
         parts.append("</ul>")
     Path(OUT_PATH).write_text("\n".join(parts), encoding="utf-8")
     print(f"\n{len(films)} filmes, {len(unmatched)} sem correspondência -> {OUT_PATH}")
-    for title, _, _, rating, _, _ in films[:10]:
+    for title, _, _, _, rating, _, _ in films[:10]:
         print(f"  {rating or '-':>4}  {title}")
 
 
