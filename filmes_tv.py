@@ -521,7 +521,7 @@ def fmt_rating(r):
 
 def fmt_votes(v):
     if v >= 999_500:
-        return f"{v / 1e6:.1f} M votos".replace(".", ",")
+        return f"{v / 1e6:.1f} M votos"
     if v >= 1000:
         return f"{round(v / 1000)} mil votos"
     return f"{v} votos"

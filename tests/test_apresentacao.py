@@ -15,10 +15,10 @@ class FormatosTest(unittest.TestCase):
         self.assertEqual(fmt_rating(7.0), "7.0")
 
     def test_votos_compactos(self):
-        self.assertEqual(fmt_votes(3247765), "3,2 M votos")
+        self.assertEqual(fmt_votes(3247765), "3.2 M votos")
         self.assertEqual(fmt_votes(63313), "63 mil votos")
         self.assertEqual(fmt_votes(812), "812 votos")
-        self.assertEqual(fmt_votes(999800), "1,0 M votos")   # sem '1000 mil'
+        self.assertEqual(fmt_votes(999800), "1.0 M votos")   # sem '1000 mil'
 
     def test_escaloes_de_rating(self):
         self.assertEqual(rating_tier(8.0), "hi")
