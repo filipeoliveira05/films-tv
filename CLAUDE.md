@@ -27,11 +27,16 @@ Limitação a ter presente: a página mostra o que passou na grelha, não o que 
 ## Estado atual
 
 **Feito**
-- Script único `filmes_tv.py` escrito e a compilar (`python -m py_compile`).
+- Script único `filmes_tv.py`; credenciais lidas de `.env` local (gitignored; ver `.env.example`).
 - Lista de 16 canais com slugs do tudonumclick.com, todos confirmados pelo utilizador (ver tabela abaixo).
 - Pipeline completo no código: scraping -> SQLite -> TMDB -> dataset IMDb -> `filmes.html`.
 
-**Nunca foi executado.** Não houve acesso ao site a partir do ambiente onde o script foi escrito. Tudo o que se sabe sobre o HTML vem de uma única página (Hollywood), lida como texto. O parser, o matching e o download do IMDb estão por validar na prática.
+**Validado em 2026-10-05 (execução local):** scraping dos 16 canais (~2300 programas, 3 a 10 de outubro, 0 avisos de "0 programas"), parser com testes (`python -m unittest discover -s tests`), datas ("Hoje" do site = data local, confirmado com a página "No AR"). robots.txt só proíbe `/ajax/` e `/cgi-bin/`.
+**Por validar:** matching TMDB (precisa de chave real em `.env`), download do dataset IMDb, relatório, e acesso a partir dos servidores do GitHub.
+
+Achados do HTML real: cada programa é um `div.channel_data` com a hora em `<b>HH:MM às HH:MM</b>` e o título em `<b class="ml10 dib">`; a página de cada dia **abre com o programa da noite anterior que atravessa a meia-noite** (o parser data-o no dia anterior). O NOS Studios tem emissões sobrepostas no próprio site (15 sobreposições). Alguns títulos trazem o ano, ex. "Pinóquio (2019)", e séries ("T12 - Ep. 3") passam o filtro de duração.
+
+**Termos do site** (`/termos-e-condicoes/`, 2020): a secção "Cópia de conteúdos" proíbe reproduzir/distribuir a informação sem autorização. Uso pessoal a baixo ritmo parece compatível, mas publicar a grelha no GitHub Pages / `airings` num repo público é uma zona cinzenta; decisão pendente.
 
 ## Como funciona
 
