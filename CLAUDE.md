@@ -22,7 +22,7 @@ Limitação a ter presente: a página mostra o que passou na grelha, não o que 
 - Resultado final: página no **GitHub Pages** (`filmes.html`), aberta no telemóvel através de um marcador.
 - `TMDB_API_KEY` guardada como *secret* do repositório, nunca no código.
 - Persistência entre execuções (decidido: no repo): `data/airings.csv` e `data/matches.csv` (ordenados, gerados por `export_state`, lidos por `import_state`); o Actions faz commit deles. O dataset de ratings do IMDb não se guarda; volta a ser descarregado em cada execução (~8 MB comprimidos). Decisão A sobre os termos do site: repo e página públicos com a grelha, assumido pelo utilizador.
-- Cron diário às 05:00 UTC (06:00 Lisboa no verão, 05:00 no inverno), em `.github/workflows/atualizar.yml`. Por testar: se o tudonumclick.com aceita pedidos vindos dos servidores do GitHub (se nenhum canal for lido, o script falha de propósito em vez de publicar dados antigos).
+- Cron diário às 05:00 UTC (06:00 Lisboa no verão, 05:00 no inverno), em `.github/workflows/atualizar.yml`. Se nenhum canal for lido, o script falha de propósito em vez de publicar dados antigos. Página: https://filipeoliveira05.github.io/films-tv/
 
 ## Estado atual
 
@@ -34,11 +34,11 @@ Limitação a ter presente: a página mostra o que passou na grelha, não o que 
 **Validado em 2026-10-05 (execução local):** scraping dos 16 canais (~2300 programas, 3 a 10 de outubro, 0 avisos de "0 programas"), parser com testes (`python -m unittest discover -s tests`), datas ("Hoje" do site = data local, confirmado com a página "No AR"). robots.txt só proíbe `/ajax/` e `/cgi-bin/`.
 **Matching TMDB (2026-10-05, 725 títulos):** 582 com correspondência, 143 sem. A 1.ª versão (só duração) dava 624 mas com erros graves (ex.: "Inferno" -> *Insidious Inferno*, "Bird" -> *Lady Bird*); a regra atual troca cobertura por precisão. O topo da lista foi revisto à mão e está correto. Ambiguidades por remakes com o mesmo título (Annie, Shaft, Passageiros) dependem só da duração e podem falhar. Os `(VP)` e a versão original aparecem como entradas separadas. Filmes de TV/Natal com título local ficam sem correspondência.
 **Também validado:** download do dataset IMDb (1,7 M ratings em ~5 s) e geração do `filmes.html`.
-**Por validar:** acesso a partir dos servidores do GitHub e execução de ponta a ponta com `python filmes_tv.py`.
+**Validado no GitHub (2026-10-05, execução manual):** os servidores do GitHub conseguem ler o tudonumclick.com (16 canais, mesmos totais que localmente), testes e deploy para o Pages passaram, a página está online. **Por validar:** o cron automático das 05:00 UTC e o commit de `data/` pelo bot (a 1.ª execução não teve alterações para guardar); o aspeto no telemóvel.
 
 Achados do HTML real: cada programa é um `div.channel_data` com a hora em `<b>HH:MM às HH:MM</b>` e o título em `<b class="ml10 dib">`; a página de cada dia **abre com o programa da noite anterior que atravessa a meia-noite** (o parser data-o no dia anterior). O NOS Studios tem emissões sobrepostas no próprio site (15 sobreposições). Alguns títulos trazem o ano, ex. "Pinóquio (2019)", e séries ("T12 - Ep. 3") passam o filtro de duração.
 
-**Termos do site** (`/termos-e-condicoes/`, 2020): a secção "Cópia de conteúdos" proíbe reproduzir/distribuir a informação sem autorização. Uso pessoal a baixo ritmo parece compatível, mas publicar a grelha no GitHub Pages / `airings` num repo público é uma zona cinzenta; decisão pendente.
+**Termos do site** (`/termos-e-condicoes/`, 2020): a secção "Cópia de conteúdos" proíbe reproduzir/distribuir a informação sem autorização. Uso pessoal a baixo ritmo parece compatível, mas publicar a grelha no GitHub Pages / `airings` num repo público é uma zona cinzenta. Decisão do utilizador (2026-10-05): seguir com repo e página públicos (opção A), assumindo esse risco.
 
 ## Como funciona
 
@@ -58,6 +58,8 @@ Achados do HTML real: cada programa é um `div.channel_data` com a hora em `<b>H
 Os três ficheiros gerados não devem ir para o git.
 
 ## Executar
+
+Atenção: `data/*.csv` é atualizado pelo bot do Actions todos os dias. Antes de correr o script localmente, faz `git pull`, e não faças commit dos CSV de uma execução local sem necessidade (podem colidir com os do bot).
 
 ```
 pip install requests beautifulsoup4
@@ -105,15 +107,15 @@ O Cinemundo foi retirado de propósito. Não voltar a acrescentar.
 
 ## Por fazer
 
-1. Correr o script, ver os avisos por canal e corrigir `parse_programs` conforme o HTML real.
-2. Guardar 1 ou 2 páginas reais como fixtures e escrever testes simples para o parser.
-3. Confirmar o ponto das datas ("Hoje" do site vs. data local).
-4. Verificar `robots.txt` e termos do site.
-5. Avaliar a qualidade do matching numa amostra real; ajustar a tolerância de duração e normalizar títulos (acentos/apóstrofos estranhos, sufixos como "- O Filme") se necessário.
+1. ~~Correr o script e corrigir `parse_programs`~~ — feito (0 avisos nos 16 canais; só foi preciso tratar o programa que atravessa a meia-noite).
+2. ~~Fixtures e testes do parser~~ — feito (`tests/`; fixtures são excertos reduzidos, por causa dos termos do site).
+3. ~~Datas~~ — feito ("Hoje" do site = data local, confirmado com a página "No AR").
+4. ~~robots.txt e termos~~ — feito (ver "Termos do site" acima; publicação pública assumida pelo utilizador).
+5. ~~Matching~~ — avaliado e reescrito (ver "Matching TMDB" acima). Continuam por melhorar os 143 sem correspondência e os remakes ambíguos.
 6. ~~Repetir falhanços de matching~~ — feito (`RETRY_DAYS` = 30, coluna `matches.checked`).
 7. ~~Dividir o relatório em duas secções~~ — feito (ver "Relatório" acima).
 8. ~~Podar `airings` com mais de ~8 dias~~ — feito (`prune`, `KEEP_DAYS` = 8, chamada em `main()` depois do scraping; os `matches` não são podados).
-9. Workflow criado e commitado **mas nunca executado** (nem validado fora do YAML). Falta, a cargo do utilizador: secret `TMDB_API_KEY`, Settings > Pages > Source = GitHub Actions, Settings > Actions > Workflow permissions = leitura e escrita, e o push. Versões das actions (checkout v4, setup-python v5, upload-pages-artifact v3, deploy-pages v4) a rever na primeira execução.
+9. ~~GitHub Actions + Pages~~ — feito e executado com sucesso à mão em 2026-10-05 (secret, Pages com Source = GitHub Actions e permissões de escrita já configurados). Falta confirmar o cron automático e o commit de dados pelo bot.
 10. ~~Avisar quando a janela de 7 dias está incompleta~~ — feito (`history_notice`).
 11. Opcional: filtro de votos mínimos (para evitar notas altas com poucos votos), filtros por canal/rating na página.
 
