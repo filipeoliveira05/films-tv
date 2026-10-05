@@ -227,6 +227,7 @@ def is_series(title):
 
 VP_RE = re.compile(r"\s*\(vp\)\s*$", re.I)   # versão portuguesa (dobragem)
 MIN_SIM = 0.85            # semelhança mínima entre o título da TV e o do TMDB
+MIN_VOTES = 1500          # recurso: 1.º resultado do TMDB só se for muito votado
 PREFIX_PENALTY = 0.97     # casar só o prefixo ('Pretty Woman - ...') vale menos que o título inteiro
 
 
@@ -258,19 +259,25 @@ def choose(tv_title, minutes, cands):
 
     O slot costuma ser mais longo que o filme (publicidade), por isso a tolerância é assimétrica.
     Desempata pela semelhança do título e depois pela duração mais próxima.
+    Recurso: os títulos pt-PT do TMDB variam ('Duna' vs 'Dune: Parte Um'); sem título parecido,
+    aceita-se o 1.º resultado da pesquisa se for muito votado e a duração quase igual.
     """
-    best, best_key = None, None
+    best, best_key, fallback = None, None, None
     for c in cands:
         runtime = c.get("runtime") or 0
         if not (c.get("imdb_id") and runtime):
             continue
         sim = best_similarity(tv_title, c)
-        if sim < MIN_SIM or not -25 <= minutes - runtime <= 60:
+        if sim < MIN_SIM:
+            if c.get("rank") == 0 and (c.get("vote_count") or 0) >= MIN_VOTES and abs(minutes - runtime) <= 15:
+                fallback = c
+            continue
+        if not -25 <= minutes - runtime <= 60:
             continue
         key = (round(sim, 2), -abs(minutes - runtime))
         if best_key is None or key > best_key:
             best, best_key = c, key
-    return best
+    return best or fallback
 
 
 def match_title(title, minutes):
@@ -279,11 +286,11 @@ def match_title(title, minutes):
     params = {"year": year} if year else {}
     results = tmdb("/search/movie", query=query, language="pt-PT", **params)["results"][:8]
     cands = []
-    for c in results:
-        if best_similarity(query, c) < MIN_SIM:   # evita pedir detalhes de filmes que não são este
+    for rank, c in enumerate(results):
+        if rank > 0 and best_similarity(query, c) < MIN_SIM:   # evita detalhes de filmes que não são este
             continue
         d = tmdb(f"/movie/{c['id']}", append_to_response="external_ids", language="pt-PT")
-        cands.append({**d, "imdb_id": (d.get("external_ids") or {}).get("imdb_id")})
+        cands.append({**d, "rank": rank, "imdb_id": (d.get("external_ids") or {}).get("imdb_id")})
     d = choose(query, minutes, cands)
     if not d:
         return None

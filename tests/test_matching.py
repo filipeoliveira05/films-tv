@@ -53,6 +53,31 @@ class ChooseTest(unittest.TestCase):
         self.assertEqual(choose("Raiders of the Lost Ark", 115, [c])["imdb_id"], "tt0082971")
 
 
+class RecursoTest(unittest.TestCase):
+    """Título do TMDB diferente do da TV: só o 1.º resultado, muito votado, com duração quase igual."""
+
+    def test_aceita_primeiro_resultado_muito_votado(self):
+        c = {**cand("Dune: Parte Um", "Dune", 155, "tt1160419"), "rank": 0, "vote_count": 12000}
+        self.assertEqual(choose("Duna", 144, [c])["imdb_id"], "tt1160419")
+
+    def test_rejeita_pouco_votado(self):
+        c = {**cand("Os Duques de Hazzard", "The Dukes of Hazzard: The Beginning", 95), "rank": 0, "vote_count": 300}
+        self.assertIsNone(choose("O Duque", 95, [c]))
+
+    def test_rejeita_duracao_distante(self):
+        c = {**cand("Lady Bird", "Lady Bird", 93), "rank": 0, "vote_count": 9000}
+        self.assertIsNone(choose("Bird", 115, [c]))
+
+    def test_rejeita_se_nao_for_o_primeiro_resultado(self):
+        c = {**cand("Dune: Parte Um", "Dune", 155), "rank": 3, "vote_count": 12000}
+        self.assertIsNone(choose("Duna", 144, [c]))
+
+    def test_titulo_parecido_tem_prioridade_sobre_o_recurso(self):
+        primeiro = {**cand("Dune: Parte Um", "Dune", 155, "tt_dune"), "rank": 0, "vote_count": 12000}
+        certo = {**cand("Duna", "Duna", 150, "tt_certo"), "rank": 1, "vote_count": 50}
+        self.assertEqual(choose("Duna", 144, [primeiro, certo])["imdb_id"], "tt_certo")
+
+
 class CleanTitleVpTest(unittest.TestCase):
     def test_remove_vp(self):
         self.assertEqual(clean_title("Madagáscar 2 (Vp)"), ("Madagáscar 2", None))
