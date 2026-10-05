@@ -138,6 +138,11 @@ def parse_programs(page_html, day):
         title = lines[i + 1]
         if title != "Resumo":
             out.append((start, end, title))
+    # a página de um dia abre com o programa da noite anterior que atravessa a
+    # meia-noite (ex.: "23:10 às 00:55"); esse pertence ao dia anterior
+    if len(out) > 1 and out[0][1].date() > out[0][0].date() and out[1][0] < out[0][0]:
+        one_day = timedelta(days=1)
+        out[0] = (out[0][0] - one_day, out[0][1] - one_day, out[0][2])
     return out
 
 
