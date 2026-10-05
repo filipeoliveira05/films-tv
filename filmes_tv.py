@@ -13,6 +13,7 @@ Uso:
   pip install requests beautifulsoup4
   export TMDB_API_KEY=...        # chave v3, gratuita em themoviedb.org
   python filmes_tv.py
+  python filmes_tv.py --relatorio   # só regenera filmes.html (para mexer no visual)
 
 Correr todos os dias acumula histórico na base de dados (dias passados).
 """
@@ -633,6 +634,14 @@ def report(db, now=None):
 
 
 def main():
+    if "--relatorio" in sys.argv[1:]:
+        # só regenera filmes.html a partir da base de dados local: sem pedidos ao site nem ao TMDB
+        if not Path(DB_PATH).exists():
+            sys.exit(f"Não existe {DB_PATH}: corre primeiro `python filmes_tv.py`.")
+        db = sqlite3.connect(DB_PATH)
+        import_state(db)   # junta o que o bot guardou em data/ (depois de um git pull)
+        report(db)
+        return
     if not TMDB_KEY:
         sys.exit("Define a variável de ambiente TMDB_API_KEY.")
     db = sqlite3.connect(DB_PATH)

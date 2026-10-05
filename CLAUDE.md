@@ -76,6 +76,10 @@ export TMDB_API_KEY=...     # chave v3 gratuita do themoviedb.org; nunca escreve
 python filmes_tv.py
 ```
 
+### Mexer no visual sem fazer push
+
+`estilo.css` e `pagina.js` são embutidos na página ao gerá-la. Para ver alterações: editar o ficheiro, correr `python filmes_tv.py --relatorio` (0,6 s, sem pedidos de rede; usa o `filmes.db` local e junta `data/*.csv`) e abrir `filmes.html` no browser (em WSL: `explorer.exe "$(wslpath -w filmes.html)"`). Vista de telemóvel: F12 e Ctrl+Shift+M no browser. Outra hora: `filmes.html?t=<milissegundos>`. Nada vai para o site online enquanto não houver push **e** uma execução do workflow (a página é gerada lá).
+
 ## Canais (todos confirmados pelo utilizador)
 
 | Canal | Slug |
