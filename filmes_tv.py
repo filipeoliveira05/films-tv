@@ -13,7 +13,7 @@ Uso:
   pip install requests beautifulsoup4
   export TMDB_API_KEY=...        # chave v3, gratuita em themoviedb.org
   python filmes_tv.py
-  python filmes_tv.py --relatorio   # só regenera filmes.html (para mexer no visual)
+  python filmes_tv.py --relatorio   # só regenera filmes.html (sem pedidos ao site nem ao TMDB)
 
 Correr todos os dias acumula histórico na base de dados (dias passados).
 """
@@ -226,6 +226,46 @@ def import_state(db, directory=STATE_DIR):
                     f"INSERT OR IGNORE INTO {table} ({', '.join(cols)}) VALUES ({','.join('?' * len(cols))})", values
                 )
     db.commit()
+
+
+def init_db(db):
+    db.executescript(
+        """
+        CREATE TABLE IF NOT EXISTS airings(
+            channel TEXT, start TEXT, end TEXT, title TEXT, PRIMARY KEY(channel, start));
+        CREATE TABLE IF NOT EXISTS matches(
+            title TEXT PRIMARY KEY, imdb_id TEXT, original TEXT, year TEXT, runtime INT, checked TEXT);
+        CREATE TABLE IF NOT EXISTS ratings(
+            tconst TEXT PRIMARY KEY, rating REAL, votes INT);
+        """
+    )
+    migrate(db)
+
+
+STAMP_FILE = "atualizado.txt"
+
+
+def write_stamp(directory=STATE_DIR, now=None):
+    """Guarda a hora da última recolha, para a página mostrar a idade dos dados e não a da geração."""
+    directory = Path(directory)
+    directory.mkdir(parents=True, exist_ok=True)
+    stamp = (now or now_lisbon()).replace(microsecond=0)
+    (directory / STAMP_FILE).write_text(stamp.isoformat() + "\n", encoding="utf-8")
+
+
+def read_stamp(directory=STATE_DIR):
+    try:
+        return datetime.fromisoformat((Path(directory) / STAMP_FILE).read_text(encoding="utf-8").strip())
+    except (OSError, ValueError):
+        return None
+
+
+def relatorio_local(db, directory=STATE_DIR):
+    """Só regenera a página: sem scraping nem TMDB. Usa data/ e o dataset de ratings do IMDb."""
+    init_db(db)
+    import_state(db, directory)
+    load_ratings(db)
+    report(db, stamp=read_stamp(directory))
 
 
 def prune(db):
@@ -550,7 +590,7 @@ def film_item(f, airings, kind, now):
     )
 
 
-def report(db, now=None):
+def report(db, now=None, stamp=None):
     now = now or now_lisbon()
     since = (now - timedelta(days=CATCHUP_DAYS)).isoformat()
     films = collect_films(db, now)
@@ -595,7 +635,7 @@ def report(db, now=None):
         f"<style>{css}</style>",
         "<body>",
         "<header class='top'><div class='wrap'><h1>Filmes na TV</h1>"
-        f"<p>Ordenados por rating IMDb.</p><p class='stamp'>Atualizado {fmt_when(now)}</p></div></header>",
+        f"<p>Ordenados por rating IMDb.</p><p class='stamp'>Atualizado {fmt_when(stamp or now)}</p></div></header>",
         "<nav class='jump' aria-label='Secções'><div class='wrap'>"
         + "".join(
             f"<a href='#{sid}'{HIDDEN if sid == 'agora' and not items else ''}>"
@@ -635,27 +675,12 @@ def report(db, now=None):
 
 def main():
     if "--relatorio" in sys.argv[1:]:
-        # só regenera filmes.html a partir da base de dados local: sem pedidos ao site nem ao TMDB
-        if not Path(DB_PATH).exists():
-            sys.exit(f"Não existe {DB_PATH}: corre primeiro `python filmes_tv.py`.")
-        db = sqlite3.connect(DB_PATH)
-        import_state(db)   # junta o que o bot guardou em data/ (depois de um git pull)
-        report(db)
+        relatorio_local(sqlite3.connect(DB_PATH))
         return
     if not TMDB_KEY:
         sys.exit("Define a variável de ambiente TMDB_API_KEY.")
     db = sqlite3.connect(DB_PATH)
-    db.executescript(
-        """
-        CREATE TABLE IF NOT EXISTS airings(
-            channel TEXT, start TEXT, end TEXT, title TEXT, PRIMARY KEY(channel, start));
-        CREATE TABLE IF NOT EXISTS matches(
-            title TEXT PRIMARY KEY, imdb_id TEXT, original TEXT, year TEXT, runtime INT, checked TEXT);
-        CREATE TABLE IF NOT EXISTS ratings(
-            tconst TEXT PRIMARY KEY, rating REAL, votes INT);
-        """
-    )
-    migrate(db)
+    init_db(db)
     import_state(db)
     read = 0
     for channel, slug in discover_slugs().items():
@@ -671,6 +696,7 @@ def main():
     match_titles(db)
     report(db)
     export_state(db)
+    write_stamp()
 
 
 if __name__ == "__main__":
