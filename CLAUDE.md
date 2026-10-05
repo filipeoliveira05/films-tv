@@ -59,6 +59,7 @@ Conceito: o menu no ecrã (OSD) de um gravador: fundo azul de "sem sinal", texto
 - `filmes_tv.py`: todo o código.
 - `estilo.css` e `pagina.js`: o estilo e o script da página; são embutidos em `filmes.html` pelo `report` (a página continua num só ficheiro).
 - `tests/`: testes (`python -m unittest discover -s tests`).
+- `dev.py`: servidor local com recarregamento automático, só para desenvolvimento.
 - `data/`: `airings.csv` e `matches.csv`, o estado guardado no repo.
 - `filmes.db`: SQLite (tabelas `airings`, `matches`, `ratings`). Gerado.
 - `title.ratings.tsv.gz`: cache do dataset IMDb. Gerado.
@@ -78,7 +79,7 @@ python filmes_tv.py
 
 ### Mexer no visual sem fazer push
 
-`estilo.css` e `pagina.js` são embutidos na página ao gerá-la. Para ver alterações: editar o ficheiro, correr `python filmes_tv.py --relatorio` (0,6 s, sem pedidos de rede; usa o `filmes.db` local e junta `data/*.csv`) e abrir `filmes.html` no browser (em WSL: `explorer.exe "$(wslpath -w filmes.html)"`). Vista de telemóvel: F12 e Ctrl+Shift+M no browser. Outra hora: `filmes.html?t=<milissegundos>`. Nada vai para o site online enquanto não houver push **e** uma execução do workflow (a página é gerada lá).
+`python dev.py` abre um servidor em http://localhost:8000: regenera a página a cada pedido e recarrega o browser sozinho quando gravas `estilo.css`, `pagina.js` ou `filmes_tv.py` (o aviso de recarregar só existe nesse servidor; se o código tiver um erro, o erro aparece no browser). Usa o `filmes.db` local e junta `data/*.csv`, sem pedidos de rede. Alternativa manual: `python filmes_tv.py --relatorio` e abrir `filmes.html`. Vista de telemóvel: F12 e Ctrl+Shift+M. Outra hora: `?t=<milissegundos>`. Nada vai para o site online enquanto não houver push **e** uma execução do workflow (a página é gerada lá).
 
 ## Canais (todos confirmados pelo utilizador)
 
