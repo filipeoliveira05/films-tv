@@ -67,7 +67,7 @@ class PaginaTest(unittest.TestCase):
         nav = re.search(r"<nav.*?</nav>", self.html, re.S).group(0)
         self.assertIn("href='#gravar'", nav)
         self.assertIn("href='#vir'", nav)
-        self.assertNotIn("href='#agora'", nav)            # nada a dar agora: sem entrada na navegação
+        self.assertIn("href='#agora' hidden", nav)        # nada a dar agora: entrada escondida (o script pode mostrá-la)
         self.assertRegex(nav, r"Para gravar.*?<b>1</b>")
 
     def test_ids_das_seccoes(self):

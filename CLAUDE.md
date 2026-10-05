@@ -44,7 +44,7 @@ Achados do HTML real: cada programa é um `div.channel_data` com a hora em `<b>H
 
 Conceito: o menu no ecrã (OSD) de um gravador: fundo azul de "sem sinal", texto branco, ponto vermelho de REC, verde de PLAY. Cada cor tem um só significado (vermelho = gravar/urgente, verde = a dar agora, ouro = rating >= 8). Tipo: Archivo variável (Google Fonts, eixo de largura: condensado nos títulos, expandido nos ratings). Elemento central: a "fita", barra por emissão que mostra a fração da janela de 7 dias que ainda resta (vermelha se faltar menos de 1 dia). Sem JavaScript. Pensado primeiro para telemóvel; "Sem correspondência" vem recolhida. Para ver alterações, gerar a página e fotografá-la com o Chromium headless do Playwright (`~/.cache/ms-playwright`).
 
-**Problema conhecido:** a página é estática, gerada uma vez por dia (06:00). "A dar agora", "Para gravar", "A vir" e os "faltam…" ficam congelados nessa hora até à execução seguinte. Por resolver (opções: JavaScript que recalcula no browser a partir de datas absolutas; ou regenerar a página várias vezes por dia sem repetir o scraping).
+**Página viva:** o HTML é gerado uma vez por dia (06:00), mas `pagina.js` (embutido) recalcula no browser, ao abrir e de minuto a minuto, em que secção está cada emissão ("A dar agora", "Para gravar", "A vir"), os "faltam/em", a fita, o estado urgente e as contagens, a partir de `data-start`/`data-end` (segundos UTC; `epoch()` converte a hora de Lisboa). Sem JavaScript a página continua certa à hora da geração. Para testar outra hora: `?t=<milissegundos>` no endereço. Verificado a comparar o JS com o gerador Python (oráculo) em 7 horas simuladas. O aviso de histórico incompleto e a hora "Atualizado" são estáticos (da geração).
 
 ## Como funciona
 
@@ -57,7 +57,7 @@ Conceito: o menu no ecrã (OSD) de um gravador: fundo azul de "sem sinal", texto
 ## Ficheiros
 
 - `filmes_tv.py`: todo o código.
-- `estilo.css`: o estilo da página; é embutido em `filmes.html` pelo `report` (a página continua num só ficheiro).
+- `estilo.css` e `pagina.js`: o estilo e o script da página; são embutidos em `filmes.html` pelo `report` (a página continua num só ficheiro).
 - `tests/`: testes (`python -m unittest discover -s tests`).
 - `data/`: `airings.csv` e `matches.csv`, o estado guardado no repo.
 - `filmes.db`: SQLite (tabelas `airings`, `matches`, `ratings`). Gerado.

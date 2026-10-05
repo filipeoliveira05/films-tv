@@ -105,8 +105,8 @@ class SeccoesTest(unittest.TestCase):
 
     def test_urgente_quando_falta_menos_de_um_dia(self):
         # Zeta passou 28/09 12:30 -> expira 05/10 12:30, faltam 30 min
-        self.assertIn("<li class='airing urgent'><span class='where'><b>AMC</b> seg 28/09", self.sec["Para gravar"])
-        self.assertNotIn("<li class='airing urgent'><span class='where'><b>AXN</b> sex 02/10", self.sec["Para gravar"])
+        self.assertRegex(self.sec["Para gravar"], r"<li class='airing urgent'[^>]*><span class='where'><b>AMC</b> seg 28/09")
+        self.assertNotRegex(self.sec["Para gravar"], r"<li class='airing urgent'[^>]*><span class='where'><b>AXN</b> sex 02/10")
         self.assertIn("faltam 30m", self.sec["Para gravar"])
 
 

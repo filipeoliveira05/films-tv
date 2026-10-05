@@ -400,6 +400,11 @@ DIAS = ["seg", "ter", "qua", "qui", "sex", "sáb", "dom"]
 CATCHUP_DAYS = 7          # a NOS TV deixa ver o que passou nos últimos 7 dias
 
 
+def epoch(dt):
+    """Instante absoluto (segundos UTC) de uma hora de Lisboa sem fuso, para o script da página."""
+    return int(dt.replace(tzinfo=ZoneInfo("Europe/Lisbon")).timestamp())
+
+
 def fmt_when(dt):
     return f"{DIAS[dt.weekday()]} {dt:%d/%m %H:%M}"
 
@@ -465,7 +470,7 @@ def collect_films(db, now):
             )
         ]
         films.append(dict(title=title, original=original, year=year, rating=rating, votes=votes,
-                          imdb=imdb, airings=airings))
+                          imdb=imdb, airings=airings, rank=len(films)))
     return films
 
 
@@ -498,6 +503,7 @@ ICONS = {
     "gravar": "<svg viewBox='0 0 12 12' aria-hidden='true'><circle cx='6' cy='6' r='5'/></svg>",
     "vir": "<svg viewBox='0 0 12 12' aria-hidden='true'><path d='M0 1l6 5-6 5zM6 1l6 5-6 5z'/></svg>",
 }
+HIDDEN = " hidden"
 FONTS = "https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,100..900&display=swap"
 
 
@@ -520,7 +526,12 @@ def film_item(f, airings, kind, now):
             bar = f"<span class='left'>termina às {end:%H:%M}</span>"
         else:
             bar = f"<span class='left'>em {fmt_remaining(start - now)}</span>"
-        lines.append(f"<li class='airing{urgent}'><span class='where'>{who}</span>{bar}</li>")
+        # data-*: o script da página recalcula secção, prazo e fita a partir destes instantes absolutos
+        until = fmt_when(start + timedelta(days=CATCHUP_DAYS))
+        lines.append(
+            f"<li class='airing{urgent}' data-start='{epoch(start)}' data-end='{epoch(end)}' "
+            f"data-until='até {until}' data-end-label='{end:%H:%M}'><span class='where'>{who}</span>{bar}</li>"
+        )
     if f["rating"]:
         score = (
             f"<div class='score {rating_tier(f['rating'])}'><b>{fmt_rating(f['rating'])}</b>"
@@ -532,7 +543,7 @@ def film_item(f, airings, kind, now):
     orig = f['original'] or ""
     orig_html = f"<p class='orig'>{html.escape(orig)}</p>" if orig and norm(orig) != norm(f["title"]) else ""
     return (
-        f"<li class='film'>{score}<div class='info'>"
+        f"<li class='film' data-film='{f['imdb']}' data-rank='{f['rank']}'>{score}<div class='info'>"
         f"<h3><a href='https://www.imdb.com/title/{f['imdb']}/'>{html.escape(f['title'])}</a>{year}</h3>"
         f"{orig_html}<ul class='airings'>{''.join(lines)}</ul></div></li>"
     )
@@ -568,7 +579,6 @@ def report(db, now=None):
                 items.append(film_item(f, mine, sid, now))
         built.append((sid, name, intro, items))
     counts = {name: len(items) for _, name, _, items in built}
-    shown = [b for b in built if b[3] or b[0] != "agora"]   # "A dar agora" só se houver algo
 
     css = Path(__file__).with_name("estilo.css").read_text(encoding="utf-8")
     parts = [
@@ -587,8 +597,9 @@ def report(db, now=None):
         f"<p>Ordenados por rating IMDb.</p><p class='stamp'>Atualizado {fmt_when(now)}</p></div></header>",
         "<nav class='jump' aria-label='Secções'><div class='wrap'>"
         + "".join(
-            f"<a href='#{sid}'><span class='i-{sid}'>{ICONS[sid]}</span>{name} <b>{len(items)}</b></a>"
-            for sid, name, _, items in shown
+            f"<a href='#{sid}'{HIDDEN if sid == 'agora' and not items else ''}>"
+            f"<span class='i-{sid}'>{ICONS[sid]}</span>{name} <b>{len(items)}</b></a>"
+            for sid, name, _, items in built
         )
         + "</div></nav>",
         "<main class='wrap'>",
@@ -596,14 +607,16 @@ def report(db, now=None):
     notice = history_notice(db, now)
     if notice:
         parts.append(f"<p class='aviso'>{notice}</p>")
-    for sid, name, intro, items in shown:
+    for sid, name, intro, items in built:
+        # "A dar agora" fica escondida (não ausente) quando vazia: o script pode mostrá-la ao longo do dia
         parts.append(
-            f"<section id='{sid}' class='s-{sid}' aria-labelledby='h-{sid}'>"
+            f"<section id='{sid}' class='s-{sid}' aria-labelledby='h-{sid}'{HIDDEN if sid == 'agora' and not items else ''}>"
             f"<h2 id='h-{sid}'>{ICONS[sid]}<span class='name'>{name}</span><span class='count'>{len(items)}</span></h2>"
         )
         if intro:
             parts.append(f"<p class='intro'>{intro}</p>")
-        parts.append("<ol class='films'>" + "\n".join(items) + "</ol>" if items else "<p class='intro'>Nada de momento.</p>")
+        parts.append("<ol class='films'>" + "\n".join(items) + "</ol>")
+        parts.append(f"<p class='empty'{HIDDEN if items else ''}>Nada de momento.</p>")
         parts.append("</section>")
     if unmatched:
         parts.append(
@@ -614,6 +627,7 @@ def report(db, now=None):
         )
     parts.append("</main>")
     parts.append(FOOTER)
+    parts.append("<script>" + Path(__file__).with_name("pagina.js").read_text(encoding="utf-8") + "</script>")
     Path(OUT_PATH).write_text("\n".join(parts), encoding="utf-8")
     print(f"\n{', '.join(f'{n}: {c}' for n, c in counts.items())}; {len(unmatched)} sem correspondência -> {OUT_PATH}")
 
