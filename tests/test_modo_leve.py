@@ -40,7 +40,7 @@ class RelatorioLocalTest(unittest.TestCase):
         self.dir = Path(tempfile.mkdtemp()) / "data"
         origem = sqlite3.connect(":memory:")
         init_db(origem)
-        origem.execute("INSERT INTO matches VALUES ('Duna','tt1','Dune','2021',155,'2026-10-05T10:00:00')")
+        origem.execute("INSERT INTO matches (title, imdb_id, original, year, runtime, checked, poster) VALUES ('Duna','tt1','Dune','2021',155,'2026-10-05T10:00:00','/duna.jpg')")
         origem.execute("INSERT INTO airings VALUES ('AXN','2099-01-01T20:00:00','2099-01-01T22:00:00','Duna')")
         export_state(origem, self.dir)
         write_stamp(self.dir, datetime(2026, 10, 5, 6, 0))

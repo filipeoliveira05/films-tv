@@ -139,11 +139,31 @@ h2 .count {
 
 .film {
   display: grid;
-  grid-template-columns: 4.3rem 1fr;
+  grid-template-columns: 4.3rem minmax(0, 1fr) 3.7rem;
+  grid-template-areas:
+    "score head poster"
+    "score air  air";
   gap: 0 0.8rem;
   padding: 1.05rem 0;
   border-bottom: 1px solid var(--line);
 }
+
+.score { grid-area: score; }
+.head { grid-area: head; }
+.airings { grid-area: air; }
+
+/* o poster vem do TMDB; sem poster fica um retângulo com a mesma proporção, para a lista não variar */
+.poster {
+  grid-area: poster;
+  width: 3.7rem;
+  aspect-ratio: 2 / 3;
+  border-radius: 3px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.poster img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.poster.none { background: transparent; border: 1px solid var(--line); }
 
 .score b {
   display: block;
@@ -286,6 +306,8 @@ footer {
 }
 
 footer p { margin: 0; max-width: 34rem; }
+.tmdb-link { display: inline-block; margin-bottom: 0.9rem; }
+.tmdb { display: block; width: auto; height: 0.95rem; }
 footer a { color: inherit; }
 
 /* ---- movimento: o ponto REC pisca umas vezes ao abrir e fica fixo ---- */
@@ -297,7 +319,14 @@ footer a { color: inherit; }
 
 /* ---- ecrãs maiores ---- */
 @media (min-width: 48rem) {
-  .film { grid-template-columns: 4.6rem 1fr; gap: 0 1.2rem; }
+  .film {
+    grid-template-columns: 4.6rem minmax(0, 1fr) 4.6rem;
+    grid-template-areas:
+      "score head poster"
+      "score air  poster";
+    gap: 0 1.2rem;
+  }
+  .poster { width: 4.6rem; }
   .score b { font-size: 2.4rem; }
   h3 { font-size: 1.25rem; }
   .airing { font-size: 0.95rem; }

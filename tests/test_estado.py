@@ -11,7 +11,7 @@ def novo_db():
     db.executescript(
         """
         CREATE TABLE airings(channel TEXT, start TEXT, end TEXT, title TEXT, PRIMARY KEY(channel, start));
-        CREATE TABLE matches(title TEXT PRIMARY KEY, imdb_id TEXT, original TEXT, year TEXT, runtime INT, checked TEXT);
+        CREATE TABLE matches(title TEXT PRIMARY KEY, imdb_id TEXT, original TEXT, year TEXT, runtime INT, checked TEXT, poster TEXT);
         """
     )
     return db
@@ -25,9 +25,9 @@ class EstadoTest(unittest.TestCase):
             ("AXN", "2026-10-06T21:00:00", "2026-10-06T23:00:00", 'Pinóquio, o "Filme" (2019)'),
             ("AMC", "2026-10-05T21:00:00", "2026-10-05T23:00:00", "Éden"),
         ])
-        self.db.executemany("INSERT INTO matches VALUES (?,?,?,?,?,?)", [
-            ("Éden", "tt1", "Eden", "2025", 129, "2026-10-05T10:00:00"),
-            ("Sem Match", None, None, None, None, "2026-10-05T10:00:00"),
+        self.db.executemany("INSERT INTO matches VALUES (?,?,?,?,?,?,?)", [
+            ("Éden", "tt1", "Eden", "2025", 129, "2026-10-05T10:00:00", "/eden.jpg"),
+            ("Sem Match", None, None, None, None, "2026-10-05T10:00:00", None),
         ])
 
     def test_ida_e_volta(self):
@@ -59,7 +59,7 @@ class EstadoTest(unittest.TestCase):
     def test_import_nao_sobrepoe_o_que_ja_existe(self):
         export_state(self.db, self.dir)
         novo = novo_db()
-        novo.execute("INSERT INTO matches VALUES ('Éden', 'tt_novo', 'Eden', '2025', 129, '2026-10-06T00:00:00')")
+        novo.execute("INSERT INTO matches (title, imdb_id, original, year, runtime, checked) VALUES ('Éden', 'tt_novo', 'Eden', '2025', 129, '2026-10-06T00:00:00')")
         import_state(novo, self.dir)
         self.assertEqual(novo.execute("SELECT imdb_id FROM matches WHERE title='Éden'").fetchone()[0], "tt_novo")
 

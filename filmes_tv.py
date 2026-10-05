@@ -196,7 +196,7 @@ def scrape_channel(db, channel, slug):
 
 STATE_TABLES = {
     "airings": (["channel", "start", "end", "title"], "channel, start"),
-    "matches": (["title", "imdb_id", "original", "year", "runtime", "checked"], "title"),
+    "matches": (["title", "imdb_id", "original", "year", "runtime", "checked", "poster"], "title"),
 }
 
 
@@ -234,7 +234,7 @@ def init_db(db):
         CREATE TABLE IF NOT EXISTS airings(
             channel TEXT, start TEXT, end TEXT, title TEXT, PRIMARY KEY(channel, start));
         CREATE TABLE IF NOT EXISTS matches(
-            title TEXT PRIMARY KEY, imdb_id TEXT, original TEXT, year TEXT, runtime INT, checked TEXT);
+            title TEXT PRIMARY KEY, imdb_id TEXT, original TEXT, year TEXT, runtime INT, checked TEXT, poster TEXT);
         CREATE TABLE IF NOT EXISTS ratings(
             tconst TEXT PRIMARY KEY, rating REAL, votes INT);
         """
@@ -376,7 +376,7 @@ def choose(tv_title, minutes, cands):
 
 
 def match_title(title, minutes):
-    """Devolve (imdb_id, título original, ano, duração) ou None."""
+    """Devolve (imdb_id, título original, ano, duração, poster_path) ou None."""
     query, year = clean_title(title)
     params = {"year": year} if year else {}
     results = tmdb("/search/movie", query=query, language="pt-PT", **params)["results"][:8]
@@ -389,7 +389,7 @@ def match_title(title, minutes):
     d = choose(query, minutes, cands)
     if not d:
         return None
-    return d["imdb_id"], d.get("original_title"), (d.get("release_date") or "")[:4], d["runtime"]
+    return d["imdb_id"], d.get("original_title"), (d.get("release_date") or "")[:4], d["runtime"], d.get("poster_path")
 
 
 RETRY_DAYS = 30           # os falhanços de matching são repetidos ao fim deste tempo
@@ -400,6 +400,8 @@ def migrate(db, now=None):
     cols = [r[1] for r in db.execute("PRAGMA table_info(matches)")]
     if "checked" not in cols:
         db.execute("ALTER TABLE matches ADD COLUMN checked TEXT")
+    if "poster" not in cols:
+        db.execute("ALTER TABLE matches ADD COLUMN poster TEXT")
     db.execute("UPDATE matches SET checked = ? WHERE checked IS NULL", ((now or now_lisbon()).isoformat(),))
     db.commit()
 
@@ -428,12 +430,37 @@ def match_titles(db):
             continue
         # guarda também os falhanços (imdb_id NULL) para não repetir pedidos até RETRY_DAYS
         db.execute(
-            "INSERT OR REPLACE INTO matches (title, imdb_id, original, year, runtime, checked) VALUES (?,?,?,?,?,?)",
-            (title, *(res if res else (None, None, None, None)), now_lisbon().isoformat()),
+            "INSERT OR REPLACE INTO matches (title, imdb_id, original, year, runtime, poster, checked) VALUES (?,?,?,?,?,?,?)",
+            (title, *(res if res else (None,) * 5), now_lisbon().isoformat()),
         )
         db.commit()
         print(f"[{n}/{len(rows)}] {title} -> {res[0] if res else 'sem correspondência'}")
         time.sleep(0.1)
+
+
+POSTER_BASE = "https://image.tmdb.org/t/p/w185"
+NO_POSTER = "-"           # o TMDB não tem poster deste filme: não voltar a perguntar
+
+
+def poster_url(path):
+    return f"{POSTER_BASE}{path}" if path and path != NO_POSTER else None
+
+
+def fill_posters(db, delay=0.1):
+    """Preenche o poster dos filmes já identificados (os novos trazem-no do matching). Só fala com o TMDB."""
+    todo = [r[0] for r in db.execute("SELECT DISTINCT imdb_id FROM matches WHERE imdb_id IS NOT NULL AND poster IS NULL")]
+    for n, imdb in enumerate(todo, 1):
+        try:
+            found = tmdb(f"/find/{imdb}", external_source="imdb_id")["movie_results"]
+        except requests.RequestException as e:
+            print(f"! TMDB falhou no poster de {imdb}: {e}", file=sys.stderr)
+            continue   # fica por preencher: tenta-se na próxima execução
+        path = (found[0].get("poster_path") if found else None) or NO_POSTER
+        db.execute("UPDATE matches SET poster = ? WHERE imdb_id = ?", (path, imdb))
+        db.commit()
+        if n % 100 == 0:
+            print(f"posters: {n}/{len(todo)}")
+        time.sleep(delay)
 
 
 # ---------------------------------------------------------------- relatório
@@ -476,12 +503,18 @@ def history_notice(db, now):
     )
 
 
-FOOTER = (
-    "<footer><div class='wrap'><p>Horários: <a href='https://tudonumclick.com'>tudonumclick.com</a>. "
-    "Ratings: dataset público do IMDb (uso pessoal e não comercial). "
-    "Este produto usa a API do <a href='https://www.themoviedb.org'>TMDB</a>, mas não é endossado nem "
-    "certificado pelo TMDB. Correspondências feitas automaticamente: podem existir erros.</p></div></footer>"
-)
+def footer_html():
+    logo = Path(__file__).with_name("tmdb.svg").read_text(encoding="utf-8")
+    logo = re.sub(r"<title>.*?</title>", "", logo).replace("<svg ", "<svg class='tmdb' role='img' aria-label='TMDB' ", 1)
+    return (
+        "<footer><div class='wrap'>"
+        f"<a href='https://www.themoviedb.org' class='tmdb-link'>{logo}</a>"
+        "<p>Horários: <a href='https://tudonumclick.com'>tudonumclick.com</a>. "
+        "Ratings: dataset público do IMDb (uso pessoal e não comercial). "
+        "Dados e imagens dos filmes: <a href='https://www.themoviedb.org'>TMDB</a>. "
+        "Este produto usa a API do TMDB, mas não é endossado nem certificado pelo TMDB. "
+        "Correspondências feitas automaticamente: podem existir erros.</p></div></footer>"
+    )
 
 
 def collect_films(db, now):
@@ -489,7 +522,7 @@ def collect_films(db, now):
     since = (now - timedelta(days=CATCHUP_DAYS)).isoformat()
     # junta a versão dobrada '(VP)' e variantes de maiúsculas do mesmo título
     rows = db.execute(
-        """SELECT m.imdb_id, MIN(m.original), MIN(m.year), r.rating, r.votes, GROUP_CONCAT(m.title, char(31))
+        """SELECT m.imdb_id, MIN(m.original), MIN(m.year), r.rating, r.votes, GROUP_CONCAT(m.title, char(31)), MAX(m.poster)
            FROM matches m LEFT JOIN ratings r ON r.tconst = m.imdb_id
            WHERE m.imdb_id IS NOT NULL
              AND EXISTS (SELECT 1 FROM airings a WHERE a.title = m.title AND a.start >= ?)
@@ -498,7 +531,7 @@ def collect_films(db, now):
         (since,),
     ).fetchall()
     films = []
-    for imdb, original, year, rating, votes, titles in rows:
+    for imdb, original, year, rating, votes, titles, poster in rows:
         titles = titles.split("\x1f")
         # título a mostrar: o que não é versão dobrada, sem o sufixo
         title = VP_RE.sub("", sorted(titles, key=lambda t: (bool(VP_RE.search(t)), t))[0])
@@ -511,7 +544,7 @@ def collect_films(db, now):
             )
         ]
         films.append(dict(title=title, original=original, year=year, rating=rating, votes=votes,
-                          imdb=imdb, airings=airings, rank=len(films)))
+                          imdb=imdb, airings=airings, rank=len(films), poster=poster))
     return films
 
 
@@ -583,10 +616,16 @@ def film_item(f, airings, kind, now):
     year = f" <span class='y'>({f['year']})</span>" if f["year"] else ""
     orig = f['original'] or ""
     orig_html = f"<p class='orig'>{html.escape(orig)}</p>" if orig and norm(orig) != norm(f["title"]) else ""
+    url = poster_url(f["poster"])
+    poster = (
+        f"<div class='poster'><img src='{url}' alt='' width='185' height='278' loading='lazy' decoding='async'></div>"
+        if url
+        else "<div class='poster none'></div>"
+    )
     return (
-        f"<li class='film' data-film='{f['imdb']}' data-rank='{f['rank']}'>{score}<div class='info'>"
-        f"<h3><a href='https://www.imdb.com/title/{f['imdb']}/'>{html.escape(f['title'])}</a>{year}</h3>"
-        f"{orig_html}<ul class='airings'>{''.join(lines)}</ul></div></li>"
+        f"<li class='film' data-film='{f['imdb']}' data-rank='{f['rank']}'>{score}"
+        f"<div class='head'><h3><a href='https://www.imdb.com/title/{f['imdb']}/'>{html.escape(f['title'])}</a>{year}</h3>"
+        f"{orig_html}</div>{poster}<ul class='airings'>{''.join(lines)}</ul></li>"
     )
 
 
@@ -667,7 +706,7 @@ def report(db, now=None, stamp=None):
             + "</ul></details>"
         )
     parts.append("</main>")
-    parts.append(FOOTER)
+    parts.append(footer_html())
     parts.append("<script>" + Path(__file__).with_name("pagina.js").read_text(encoding="utf-8") + "</script>")
     Path(OUT_PATH).write_text("\n".join(parts), encoding="utf-8")
     print(f"\n{', '.join(f'{n}: {c}' for n, c in counts.items())}; {len(unmatched)} sem correspondência -> {OUT_PATH}")
@@ -694,6 +733,7 @@ def main():
     prune(db)
     load_ratings(db)
     match_titles(db)
+    fill_posters(db)
     report(db)
     export_state(db)
     write_stamp()

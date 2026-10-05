@@ -46,6 +46,10 @@ Conceito: o menu no ecrã (OSD) de um gravador: fundo azul de "sem sinal", texto
 
 **Página viva:** o HTML é gerado uma vez por dia (06:00), mas `pagina.js` (embutido) recalcula no browser, ao abrir e de minuto a minuto, em que secção está cada emissão ("A dar agora", "Para gravar", "A vir"), os "faltam/em", a fita, o estado urgente e as contagens, a partir de `data-start`/`data-end` (segundos UTC; `epoch()` converte a hora de Lisboa). Sem JavaScript a página continua certa à hora da geração. Para testar outra hora: `?t=<milissegundos>` no endereço. Verificado a comparar o JS com o gerador Python (oráculo) em 7 horas simuladas. O aviso de histórico incompleto e a hora "Atualizado" são estáticos (da geração).
 
+## Posters
+
+Cada filme mostra o poster à direita (no telemóvel as emissões ocupam a largura toda por baixo; em ecrã largo ficam ao lado). Vêm do TMDB: `matches.poster` guarda o `poster_path` (preenchido no matching, ou por `fill_posters` via `/find/<imdb_id>` para os já identificados) e a página liga diretamente a `image.tmdb.org/t/p/w185` (`loading=lazy`, sem guardar imagens no repo). `-` em `poster` = o TMDB não tem poster (não voltar a perguntar); sem poster aparece um retângulo vazio com a mesma proporção. Os termos do TMDB exigem atribuição também para imagens: rodapé com logótipo e texto. O push em modo "só página" mostra posters porque estão em `data/matches.csv`.
+
 ## Como funciona
 
 1. **Scraping** (`discover_slugs`, `scrape_channel`, `parse_programs`): para cada canal pede `/programacao-tv/<slug>/` e depois cada dia listado na navegação da página (`/<slug>/<dia>/`). O parser não usa seletores CSS: lê o texto da página e procura linhas `HH:MM às HH:MM` seguidas do título. Guarda em `airings(channel, start, end, title)` com `INSERT OR IGNORE`, por isso correr várias vezes acumula histórico.
@@ -57,6 +61,7 @@ Conceito: o menu no ecrã (OSD) de um gravador: fundo azul de "sem sinal", texto
 ## Ficheiros
 
 - `filmes_tv.py`: todo o código.
+- `tmdb.svg`: logótipo oficial do TMDB (da página de atribuição deles), embutido no rodapé.
 - `estilo.css` e `pagina.js`: o estilo e o script da página; são embutidos em `filmes.html` pelo `report` (a página continua num só ficheiro).
 - `tests/`: testes (`python -m unittest discover -s tests`).
 - `dev.py`: servidor local com recarregamento automático, só para desenvolvimento.

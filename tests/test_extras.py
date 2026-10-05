@@ -15,7 +15,7 @@ def novo_db():
     db.executescript(
         """
         CREATE TABLE airings(channel TEXT, start TEXT, end TEXT, title TEXT, PRIMARY KEY(channel, start));
-        CREATE TABLE matches(title TEXT PRIMARY KEY, imdb_id TEXT, original TEXT, year TEXT, runtime INT);
+        CREATE TABLE matches(title TEXT PRIMARY KEY, imdb_id TEXT, original TEXT, year TEXT, runtime INT, poster TEXT);
         CREATE TABLE ratings(tconst TEXT PRIMARY KEY, rating REAL, votes INT);
         """
     )
@@ -64,7 +64,7 @@ class RetryTest(unittest.TestCase):
         for i, t in enumerate(("Novo", "Falhou Ontem", "Falhou Há 40 Dias", "Acertou Há 40 Dias")):
             airing(self.db, t, NOW - timedelta(days=1, hours=i))
         self.db.executemany(
-            "INSERT INTO matches VALUES (?,?,?,?,?,?)",
+            "INSERT INTO matches (title, imdb_id, original, year, runtime, checked) VALUES (?,?,?,?,?,?)",
             [
                 ("Falhou Ontem", None, None, None, None, (NOW - timedelta(days=1)).isoformat()),
                 ("Falhou Há 40 Dias", None, None, None, None, (NOW - timedelta(days=40)).isoformat()),
@@ -78,7 +78,7 @@ class RetryTest(unittest.TestCase):
 
     def test_migracao_marca_falhanços_antigos_como_verificados_agora(self):
         db = novo_db()
-        db.execute("INSERT INTO matches VALUES ('Legado', NULL, NULL, NULL, NULL)")
+        db.execute("INSERT INTO matches (title, imdb_id, original, year, runtime) VALUES ('Legado', NULL, NULL, NULL, NULL)")
         migrate(db, now=NOW)
         self.assertEqual(db.execute("SELECT checked FROM matches").fetchone()[0], NOW.isoformat())
         migrate(db, now=NOW)       # idempotente
