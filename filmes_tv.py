@@ -26,6 +26,7 @@ import time
 import unicodedata
 from datetime import date, datetime, timedelta
 from datetime import time as dtime
+from difflib import SequenceMatcher
 from pathlib import Path
 
 import requests
@@ -224,28 +225,69 @@ def is_series(title):
     return bool(SERIES_RE.search(title))
 
 
+VP_RE = re.compile(r"\s*\(vp\)\s*$", re.I)   # versão portuguesa (dobragem)
+MIN_SIM = 0.85            # semelhança mínima entre o título da TV e o do TMDB
+PREFIX_PENALTY = 0.97     # casar só o prefixo ('Pretty Woman - ...') vale menos que o título inteiro
+
+
 def clean_title(title):
-    """Devolve (título para pesquisa, ano ou None): apóstrofos normalizados, '(2019)' separado."""
+    """Devolve (título para pesquisa, ano ou None): apóstrofos normalizados, '(VP)' e '(2019)' separados."""
     t = title.replace("´", "'").replace("`", "'")
+    t = VP_RE.sub("", t)
     m = YEAR_RE.search(t)
     if m:
         t = t[: m.start()]
     return t.strip(), (m.group(1) if m else None)
 
 
+def similarity(tv_title, cand_title):
+    """0..1; ignora acentos/maiúsculas. O prefixo antes de ' - ' ou ': ' do título da TV vale um pouco menos."""
+    full = SequenceMatcher(None, norm(tv_title), norm(cand_title)).ratio()
+    head = re.split(r"\s+-\s+|:\s+", tv_title)[0]
+    if head == tv_title:
+        return full
+    return max(full, PREFIX_PENALTY * SequenceMatcher(None, norm(head), norm(cand_title)).ratio())
+
+
+def best_similarity(tv_title, c):
+    return max(similarity(tv_title, c.get("title") or ""), similarity(tv_title, c.get("original_title") or ""))
+
+
+def choose(tv_title, minutes, cands):
+    """Escolhe entre candidatos TMDB (com runtime e imdb_id): título parecido, duração compatível.
+
+    O slot costuma ser mais longo que o filme (publicidade), por isso a tolerância é assimétrica.
+    Desempata pela semelhança do título e depois pela duração mais próxima.
+    """
+    best, best_key = None, None
+    for c in cands:
+        runtime = c.get("runtime") or 0
+        if not (c.get("imdb_id") and runtime):
+            continue
+        sim = best_similarity(tv_title, c)
+        if sim < MIN_SIM or not -25 <= minutes - runtime <= 60:
+            continue
+        key = (round(sim, 2), -abs(minutes - runtime))
+        if best_key is None or key > best_key:
+            best, best_key = c, key
+    return best
+
+
 def match_title(title, minutes):
     """Devolve (imdb_id, título original, ano, duração) ou None."""
     query, year = clean_title(title)
     params = {"year": year} if year else {}
-    results = tmdb("/search/movie", query=query, language="pt-PT", **params)["results"][:5]
+    results = tmdb("/search/movie", query=query, language="pt-PT", **params)["results"][:8]
+    cands = []
     for c in results:
+        if best_similarity(query, c) < MIN_SIM:   # evita pedir detalhes de filmes que não são este
+            continue
         d = tmdb(f"/movie/{c['id']}", append_to_response="external_ids", language="pt-PT")
-        runtime = d.get("runtime") or 0
-        imdb = (d.get("external_ids") or {}).get("imdb_id")
-        # a duração do slot tem de ser próxima da duração do filme
-        if imdb and runtime and abs(runtime - minutes) <= max(20, 0.25 * minutes):
-            return imdb, d.get("original_title"), (d.get("release_date") or "")[:4], runtime
-    return None
+        cands.append({**d, "imdb_id": (d.get("external_ids") or {}).get("imdb_id")})
+    d = choose(query, minutes, cands)
+    if not d:
+        return None
+    return d["imdb_id"], d.get("original_title"), (d.get("release_date") or "")[:4], d["runtime"]
 
 
 def match_titles(db):
