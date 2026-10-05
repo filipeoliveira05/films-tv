@@ -21,7 +21,7 @@ class DevTest(unittest.TestCase):
             os.utime(css, (novo, novo))
             self.assertNotEqual(antes, dev.mtime())
         finally:
-            os.utime(css, (original.st_atime, original.st_mtime))
+            os.utime(css, ns=(original.st_atime_ns, original.st_mtime_ns))   # em ns: um float perderia precisão
         self.assertEqual(antes, dev.mtime())
 
     def test_a_pagina_real_nao_tem_o_aviso_de_recarregar(self):
