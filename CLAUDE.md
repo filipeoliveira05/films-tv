@@ -32,7 +32,9 @@ Limitação a ter presente: a página mostra o que passou na grelha, não o que 
 - Pipeline completo no código: scraping -> SQLite -> TMDB -> dataset IMDb -> `filmes.html`.
 
 **Validado em 2026-10-05 (execução local):** scraping dos 16 canais (~2300 programas, 3 a 10 de outubro, 0 avisos de "0 programas"), parser com testes (`python -m unittest discover -s tests`), datas ("Hoje" do site = data local, confirmado com a página "No AR"). robots.txt só proíbe `/ajax/` e `/cgi-bin/`.
-**Por validar:** matching TMDB (precisa de chave real em `.env`), download do dataset IMDb, relatório, e acesso a partir dos servidores do GitHub.
+**Matching TMDB (2026-10-05, 725 títulos):** 582 com correspondência, 143 sem. A 1.ª versão (só duração) dava 624 mas com erros graves (ex.: "Inferno" -> *Insidious Inferno*, "Bird" -> *Lady Bird*); a regra atual troca cobertura por precisão. O topo da lista foi revisto à mão e está correto. Ambiguidades por remakes com o mesmo título (Annie, Shaft, Passageiros) dependem só da duração e podem falhar. Os `(VP)` e a versão original aparecem como entradas separadas. Filmes de TV/Natal com título local ficam sem correspondência.
+**Também validado:** download do dataset IMDb (1,7 M ratings em ~5 s) e geração do `filmes.html`.
+**Por validar:** acesso a partir dos servidores do GitHub e execução de ponta a ponta com `python filmes_tv.py`.
 
 Achados do HTML real: cada programa é um `div.channel_data` com a hora em `<b>HH:MM às HH:MM</b>` e o título em `<b class="ml10 dib">`; a página de cada dia **abre com o programa da noite anterior que atravessa a meia-noite** (o parser data-o no dia anterior). O NOS Studios tem emissões sobrepostas no próprio site (15 sobreposições). Alguns títulos trazem o ano, ex. "Pinóquio (2019)", e séries ("T12 - Ep. 3") passam o filtro de duração.
 
@@ -42,7 +44,7 @@ Achados do HTML real: cada programa é um `div.channel_data` com a hora em `<b>H
 
 1. **Scraping** (`discover_slugs`, `scrape_channel`, `parse_programs`): para cada canal pede `/programacao-tv/<slug>/` e depois cada dia listado na navegação da página (`/<slug>/<dia>/`). O parser não usa seletores CSS: lê o texto da página e procura linhas `HH:MM às HH:MM` seguidas do título. Guarda em `airings(channel, start, end, title)` com `INSERT OR IGNORE`, por isso correr várias vezes acumula histórico.
 2. **Filtro de filmes**: considera filme qualquer programa com duração >= `MIN_MINUTES` (75). É uma heurística; não há categoria no site.
-3. **Matching TMDB** (`match_title`): pesquisa `/search/movie` em `pt-PT`, vê os 5 primeiros resultados e aceita o primeiro cujo `runtime` esteja próximo da duração do slot (tolerância `max(20, 25%)`) e que tenha `imdb_id`. Os falhanços ficam guardados em `matches` com `imdb_id` NULL para não repetir pedidos.
+3. **Matching TMDB** (`match_title`, `choose`): pesquisa `/search/movie` em `pt-PT` (com `year` se o título trouxer "(2019)"; `(VP)` e `´` são normalizados; episódios "T12 - Ep. 3" são ignorados). Só vê detalhes de resultados cujo título (pt-PT ou original) seja parecido (`similarity` >= 0.85, ignorando acentos/maiúsculas; o prefixo antes de " - " ou ": " vale um pouco menos). Duração do slot vs. filme com tolerância assimétrica (slot pode ser até 60 min mais longo por publicidade, ou 25 mais curto); desempata por semelhança e depois por duração. Recurso: sem título parecido, aceita o 1.º resultado se tiver >= 1500 votos e duração a ±15 min (ex.: "Duna" vs "Dune: Parte Um"). Os falhanços ficam em `matches` com `imdb_id` NULL.
 4. **Ratings**: descarrega `title.ratings.tsv.gz` de datasets.imdbws.com (refresca se tiver mais de 7 dias) para a tabela `ratings`; o join é local.
 5. **Relatório** (`report`): gera `filmes.html` ordenado por rating (sem rating no fim), com os horários por canal (passados a cinzento) e uma secção "Sem correspondência".
 
