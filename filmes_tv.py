@@ -341,7 +341,7 @@ def report(db):
     for imdb, original, year, rating, votes, titles in rows:
         titles = titles.split("\x1f")
         # título a mostrar: o que não é versão dobrada
-        title = sorted(titles, key=lambda t: (bool(VP_RE.search(t)), t))[0]
+        title = VP_RE.sub("", sorted(titles, key=lambda t: (bool(VP_RE.search(t)), t))[0])
         films.append((title, titles, original, year, rating, votes, imdb))
     unmatched = db.execute(
         """SELECT DISTINCT a.title FROM airings a

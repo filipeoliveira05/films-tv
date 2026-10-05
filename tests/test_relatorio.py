@@ -29,15 +29,17 @@ class RelatorioTest(unittest.TestCase):
                 ("O Caso DeLorean", "tt2", "Driven", "2019", 108),
                 ("O Caso Delorean", "tt2", "Driven", "2019", 108),
                 ("Duna", "tt3", "Dune", "2021", 155),
+                ("Madagáscar 2 (Vp)", "tt4", "Madagascar: Escape 2 Africa", "2008", 89),
             ],
         )
-        self.db.executemany("INSERT INTO ratings VALUES (?,?,?)", [("tt1", 6.4, 1000), ("tt2", 6.0, 500), ("tt3", 8.0, 9000)])
+        self.db.executemany("INSERT INTO ratings VALUES (?,?,?)", [("tt1", 6.4, 1000), ("tt2", 6.0, 500), ("tt3", 8.0, 9000), ("tt4", 6.7, 2000)])
         rows = [
             ("TVCine Top", iso(1), iso(1.1), "Mínimos"),
             ("Panda", iso(2), iso(2.1), "Mínimos (VP)"),
             ("NOS Studios", iso(1), iso(1.1), "O Caso DeLorean"),
             ("NOS Studios", iso(2), iso(2.1), "O Caso Delorean"),
             ("AXN", iso(3), iso(3.1), "Duna"),
+            ("STAR Comedy", iso(1), iso(1.1), "Madagáscar 2 (Vp)"),
         ]
         self.db.executemany("INSERT INTO airings VALUES (?,?,?,?)", rows)
         self.out = Path(tempfile.mkdtemp()) / "out.html"
@@ -50,13 +52,17 @@ class RelatorioTest(unittest.TestCase):
         filmes_tv.OUT_PATH = self._old
 
     def test_junta_vp_e_variantes_de_maiusculas(self):
-        self.assertEqual(self.html.count("<li><span class='r'>"), 3)
+        self.assertEqual(self.html.count("<li><span class='r'>"), 4)
 
     def test_titulo_sem_vp_e_horarios_juntos(self):
         self.assertIn(">Mínimos</a>", self.html)
         self.assertNotIn(">Mínimos (VP)</a>", self.html)
         self.assertIn("TVCine Top", self.html)
         self.assertIn("Panda (VP)", self.html)   # emissão dobrada marcada
+
+    def test_vp_sozinho_sem_sufixo_no_titulo(self):
+        self.assertIn(">Madagáscar 2</a>", self.html)
+        self.assertIn("STAR Comedy (VP)", self.html)
 
     def test_ano_junto_ao_titulo(self):
         self.assertIn("Duna</a> <span class='y'>(2021)</span>", self.html)
