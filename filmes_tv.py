@@ -215,9 +215,29 @@ def tmdb(path, **params):
     return r.json()
 
 
+SERIES_RE = re.compile(r"\bT\d+\s*-\s*Ep\.?\s*\d+", re.I)
+YEAR_RE = re.compile(r"\s*\((\d{4})\)\s*$")
+
+
+def is_series(title):
+    """Episódios ('T12 - Ep. 3') não são filmes, mesmo que durem >= MIN_MINUTES."""
+    return bool(SERIES_RE.search(title))
+
+
+def clean_title(title):
+    """Devolve (título para pesquisa, ano ou None): apóstrofos normalizados, '(2019)' separado."""
+    t = title.replace("´", "'").replace("`", "'")
+    m = YEAR_RE.search(t)
+    if m:
+        t = t[: m.start()]
+    return t.strip(), (m.group(1) if m else None)
+
+
 def match_title(title, minutes):
     """Devolve (imdb_id, título original, ano, duração) ou None."""
-    results = tmdb("/search/movie", query=title, language="pt-PT")["results"][:5]
+    query, year = clean_title(title)
+    params = {"year": year} if year else {}
+    results = tmdb("/search/movie", query=query, language="pt-PT", **params)["results"][:5]
     for c in results:
         d = tmdb(f"/movie/{c['id']}", append_to_response="external_ids", language="pt-PT")
         runtime = d.get("runtime") or 0
@@ -237,6 +257,7 @@ def match_titles(db):
            GROUP BY title""",
         (MIN_MINUTES,),
     ).fetchall()
+    rows = [r for r in rows if not is_series(r[0])]
     for n, (title, mins) in enumerate(rows, 1):
         try:
             res = match_title(title, mins)
@@ -273,6 +294,7 @@ def report(db):
            ORDER BY a.title""",
         (since, MIN_MINUTES),
     ).fetchall()
+    unmatched = [(t,) for (t,) in unmatched if not is_series(t)]
 
     parts = [
         "<!doctype html><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'>",
