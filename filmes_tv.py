@@ -754,8 +754,8 @@ def report(db, now=None, stamp=None):
             for sid, name, _, items in built
         )
         + "</div>"
-        + "<div class='find' hidden><input type='search' id='q' placeholder='Pesquisar filme' "
-        "aria-label='Pesquisar filme' autocomplete='off' spellcheck='false' enterkeyhint='search'>"
+        + "<div class='find' hidden><input type='search' id='q' placeholder='Pesquisar filme, ator' "
+        "aria-label='Pesquisar filme, ator' autocomplete='off' spellcheck='false' enterkeyhint='search'>"
         "<button type='button' class='clear' aria-label='Limpar pesquisa' hidden>&times;</button></div>"
         "</div></nav>",
         "<main class='wrap'>",

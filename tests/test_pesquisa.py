@@ -70,7 +70,8 @@ class MarcacaoTest(unittest.TestCase):
         nav = re.search(r"<nav.*?</nav>", self.html, re.S).group(0)
         self.assertIn("<div class='find' hidden>", nav)
         self.assertIn("type='search'", nav)
-        self.assertIn("aria-label='Pesquisar filme'", nav)
+        self.assertIn("placeholder='Pesquisar filme, ator'", nav)
+        self.assertIn("aria-label='Pesquisar filme, ator'", nav)
         self.assertIn("autocomplete='off'", nav)
         self.assertIn("<button type='button' class='clear' aria-label='Limpar pesquisa' hidden>", nav)
 
