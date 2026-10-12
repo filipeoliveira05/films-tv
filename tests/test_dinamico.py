@@ -10,13 +10,7 @@ import filmes_tv
 
 def gerar(airings, now):
     db = sqlite3.connect(":memory:")
-    db.executescript(
-        """
-        CREATE TABLE airings(channel TEXT, start TEXT, end TEXT, title TEXT, PRIMARY KEY(channel, start));
-        CREATE TABLE matches(title TEXT PRIMARY KEY, imdb_id TEXT, original TEXT, year TEXT, runtime INT, poster TEXT);
-        CREATE TABLE ratings(tconst TEXT PRIMARY KEY, rating REAL, votes INT);
-        """
-    )
+    filmes_tv.init_db(db)
     db.executemany("INSERT INTO matches (title, imdb_id, original, year, runtime) VALUES (?,?,?,?,?)", [("Alfa", "tt1", "A", "2001", 100), ("Beta", "tt2", "B", "2002", 100)])
     db.executemany("INSERT INTO ratings VALUES (?,?,?)", [("tt1", 7.0, 1000), ("tt2", 8.0, 1000)])
     db.executemany("INSERT INTO airings VALUES (?,?,?,?)", airings)

@@ -29,13 +29,7 @@ def dt(day, hour, minute=0):
 class SeccoesTest(unittest.TestCase):
     def setUp(self):
         db = sqlite3.connect(":memory:")
-        db.executescript(
-            """
-            CREATE TABLE airings(channel TEXT, start TEXT, end TEXT, title TEXT, PRIMARY KEY(channel, start));
-            CREATE TABLE matches(title TEXT PRIMARY KEY, imdb_id TEXT, original TEXT, year TEXT, runtime INT, poster TEXT);
-            CREATE TABLE ratings(tconst TEXT PRIMARY KEY, rating REAL, votes INT);
-            """
-        )
+        filmes_tv.init_db(db)
         db.executemany("INSERT INTO matches (title, imdb_id, original, year, runtime) VALUES (?,?,?,?,?)", [
             ("Alfa", "tt1", "Alpha", "2001", 100),    # passou há 3 dias e volta dia 7
             ("Beta", "tt2", "Beta", "2002", 100),     # só futuro

@@ -3,17 +3,12 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from filmes_tv import export_state, import_state, migrate
+from filmes_tv import export_state, import_state, init_db, migrate
 
 
 def novo_db():
     db = sqlite3.connect(":memory:")
-    db.executescript(
-        """
-        CREATE TABLE airings(channel TEXT, start TEXT, end TEXT, title TEXT, PRIMARY KEY(channel, start));
-        CREATE TABLE matches(title TEXT PRIMARY KEY, imdb_id TEXT, original TEXT, year TEXT, runtime INT, checked TEXT, poster TEXT);
-        """
-    )
+    init_db(db)
     return db
 
 
@@ -25,7 +20,7 @@ class EstadoTest(unittest.TestCase):
             ("AXN", "2026-10-06T21:00:00", "2026-10-06T23:00:00", 'Pinóquio, o "Filme" (2019)'),
             ("AMC", "2026-10-05T21:00:00", "2026-10-05T23:00:00", "Éden"),
         ])
-        self.db.executemany("INSERT INTO matches VALUES (?,?,?,?,?,?,?)", [
+        self.db.executemany("INSERT INTO matches (title, imdb_id, original, year, runtime, checked, poster) VALUES (?,?,?,?,?,?,?)", [
             ("Éden", "tt1", "Eden", "2025", 129, "2026-10-05T10:00:00", "/eden.jpg"),
             ("Sem Match", None, None, None, None, "2026-10-05T10:00:00", None),
         ])

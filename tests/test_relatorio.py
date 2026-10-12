@@ -14,13 +14,7 @@ def iso(days):
 class RelatorioTest(unittest.TestCase):
     def setUp(self):
         self.db = sqlite3.connect(":memory:")
-        self.db.executescript(
-            """
-            CREATE TABLE airings(channel TEXT, start TEXT, end TEXT, title TEXT, PRIMARY KEY(channel, start));
-            CREATE TABLE matches(title TEXT PRIMARY KEY, imdb_id TEXT, original TEXT, year TEXT, runtime INT, poster TEXT);
-            CREATE TABLE ratings(tconst TEXT PRIMARY KEY, rating REAL, votes INT);
-            """
-        )
+        filmes_tv.init_db(self.db)
         self.db.executemany(
             "INSERT INTO matches (title, imdb_id, original, year, runtime) VALUES (?,?,?,?,?)",
             [

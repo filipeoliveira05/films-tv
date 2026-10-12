@@ -35,13 +35,7 @@ class FormatosTest(unittest.TestCase):
 class PaginaTest(unittest.TestCase):
     def setUp(self):
         db = sqlite3.connect(":memory:")
-        db.executescript(
-            """
-            CREATE TABLE airings(channel TEXT, start TEXT, end TEXT, title TEXT, PRIMARY KEY(channel, start));
-            CREATE TABLE matches(title TEXT PRIMARY KEY, imdb_id TEXT, original TEXT, year TEXT, runtime INT, poster TEXT);
-            CREATE TABLE ratings(tconst TEXT PRIMARY KEY, rating REAL, votes INT);
-            """
-        )
+        filmes_tv.init_db(db)
         db.execute("INSERT INTO matches (title, imdb_id, original, year, runtime) VALUES ('Duna','tt1','Dune','2021',155)")
         db.execute("INSERT INTO ratings VALUES ('tt1', 8.0, 812)")
         db.execute("INSERT INTO airings VALUES ('AXN','2026-10-02T20:00:00','2026-10-02T22:00:00','Duna')")

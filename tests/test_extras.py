@@ -44,7 +44,8 @@ class HistoryNoticeTest(unittest.TestCase):
         self.assertIsNone(history_notice(db, NOW))
 
     def test_relatorio_mostra_aviso(self):
-        db = novo_db()
+        db = sqlite3.connect(":memory:")
+        filmes_tv.init_db(db)
         airing(db, "A", datetime(2026, 10, 20, 8))
         out = Path(tempfile.mkdtemp()) / "o.html"
         old = filmes_tv.OUT_PATH
