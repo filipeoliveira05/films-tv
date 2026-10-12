@@ -98,7 +98,7 @@ class MatchTitlesGuardaPosterTest(unittest.TestCase):
             ("AXN", "2026-10-07T20:00:00", "2026-10-07T22:00:00", "Filme Sem Match"),
         ])
         saved = filmes_tv.match_title, filmes_tv.time.sleep
-        filmes_tv.match_title = lambda t, m: ("tt9", "Good Film", "2020", 118, "/bom.jpg") if t == "Filme Bom" else None
+        filmes_tv.match_title = lambda t, m: ("tt9", "Good Film", "2020", 118, "/bom.jpg", "Ana|Rui") if t == "Filme Bom" else None
         filmes_tv.time.sleep = lambda s: None
         self.addCleanup(lambda: (setattr(filmes_tv, "match_title", saved[0]), setattr(filmes_tv.time, "sleep", saved[1])))
         match_titles(db)

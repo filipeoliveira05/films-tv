@@ -231,7 +231,7 @@ def scrape_channel(db, channel, slug):
 
 STATE_TABLES = {
     "airings": (["channel", "start", "end", "title"], "channel, start"),
-    "matches": (["title", "imdb_id", "original", "year", "runtime", "checked", "poster"], "title"),
+    "matches": (["title", "imdb_id", "original", "year", "runtime", "checked", "poster", "elenco"], "title"),
 }
 
 
@@ -269,7 +269,7 @@ def init_db(db):
         CREATE TABLE IF NOT EXISTS airings(
             channel TEXT, start TEXT, end TEXT, title TEXT, PRIMARY KEY(channel, start));
         CREATE TABLE IF NOT EXISTS matches(
-            title TEXT PRIMARY KEY, imdb_id TEXT, original TEXT, year TEXT, runtime INT, checked TEXT, poster TEXT);
+            title TEXT PRIMARY KEY, imdb_id TEXT, original TEXT, year TEXT, runtime INT, checked TEXT, poster TEXT, elenco TEXT);
         CREATE TABLE IF NOT EXISTS ratings(
             tconst TEXT PRIMARY KEY, rating REAL, votes INT);
         """
@@ -411,7 +411,7 @@ def choose(tv_title, minutes, cands):
 
 
 def match_title(title, minutes):
-    """Devolve (imdb_id, título original, ano, duração, poster_path) ou None."""
+    """Devolve (imdb_id, título original, ano, duração, poster_path, elenco) ou None."""
     query, year = clean_title(title)
     params = {"year": year} if year else {}
     results = tmdb("/search/movie", query=query, language="pt-PT", **params)["results"][:8]
@@ -419,12 +419,13 @@ def match_title(title, minutes):
     for rank, c in enumerate(results):
         if rank > 0 and best_similarity(query, c) < MIN_SIM:   # evita detalhes de filmes que não são este
             continue
-        d = tmdb(f"/movie/{c['id']}", append_to_response="external_ids", language="pt-PT")
+        d = tmdb(f"/movie/{c['id']}", append_to_response="external_ids,credits", language="pt-PT")
         cands.append({**d, "rank": rank, "imdb_id": (d.get("external_ids") or {}).get("imdb_id")})
     d = choose(query, minutes, cands)
     if not d:
         return None
-    return d["imdb_id"], d.get("original_title"), (d.get("release_date") or "")[:4], d["runtime"], d.get("poster_path")
+    return (d["imdb_id"], d.get("original_title"), (d.get("release_date") or "")[:4], d["runtime"],
+            d.get("poster_path"), elenco_from_details(d))
 
 
 RETRY_DAYS = 30           # os falhanços de matching são repetidos ao fim deste tempo
@@ -437,6 +438,8 @@ def migrate(db, now=None):
         db.execute("ALTER TABLE matches ADD COLUMN checked TEXT")
     if "poster" not in cols:
         db.execute("ALTER TABLE matches ADD COLUMN poster TEXT")
+    if "elenco" not in cols:
+        db.execute("ALTER TABLE matches ADD COLUMN elenco TEXT")
     db.execute("UPDATE matches SET checked = ? WHERE checked IS NULL", ((now or now_lisbon()).isoformat(),))
     db.commit()
 
@@ -465,8 +468,9 @@ def match_titles(db):
             continue
         # guarda também os falhanços (imdb_id NULL) para não repetir pedidos até RETRY_DAYS
         db.execute(
-            "INSERT OR REPLACE INTO matches (title, imdb_id, original, year, runtime, poster, checked) VALUES (?,?,?,?,?,?,?)",
-            (title, *(res if res else (None,) * 5), now_lisbon().isoformat()),
+            "INSERT OR REPLACE INTO matches (title, imdb_id, original, year, runtime, poster, elenco, checked) "
+            "VALUES (?,?,?,?,?,?,?,?)",
+            (title, *(res if res else (None,) * 6), now_lisbon().isoformat()),
         )
         db.commit()
         print(f"[{n}/{len(rows)}] {title} -> {res[0] if res else 'sem correspondência'}")
@@ -495,6 +499,33 @@ def fill_posters(db, delay=0.1):
         db.commit()
         if n % 100 == 0:
             print(f"posters: {n}/{len(todo)}")
+        time.sleep(delay)
+
+
+NO_ELENCO = "-"          # o TMDB não tem elenco deste filme: não voltar a perguntar
+
+
+def elenco_from_details(d):
+    """Elenco completo, em ordem de crédito, como 'Nome|Nome|...' (ou '-' se não houver)."""
+    cast = (d.get("credits") or {}).get("cast") or []
+    names = [str(c.get("name") or "").replace("|", " ").strip() for c in cast]
+    return "|".join(n for n in names if n) or NO_ELENCO
+
+
+def fill_elenco(db, delay=0.1):
+    """Preenche o elenco dos filmes já identificados (os novos trazem-no do matching). Só fala com o TMDB."""
+    todo = [r[0] for r in db.execute("SELECT DISTINCT imdb_id FROM matches WHERE imdb_id IS NOT NULL AND elenco IS NULL")]
+    for n, imdb in enumerate(todo, 1):
+        try:
+            found = tmdb(f"/find/{imdb}", external_source="imdb_id")["movie_results"]
+            elenco = elenco_from_details({"credits": tmdb(f"/movie/{found[0]['id']}/credits")}) if found else NO_ELENCO
+        except requests.RequestException as e:
+            print(f"! TMDB falhou no elenco de {imdb}: {e}", file=sys.stderr)
+            continue   # fica por preencher: tenta-se na próxima execução
+        db.execute("UPDATE matches SET elenco = ? WHERE imdb_id = ?", (elenco, imdb))
+        db.commit()
+        if n % 100 == 0:
+            print(f"elenco: {n}/{len(todo)}")
         time.sleep(delay)
 
 
@@ -557,7 +588,7 @@ def collect_films(db, now):
     since = (now - timedelta(days=CATCHUP_DAYS)).isoformat()
     # junta a versão dobrada '(VP)' e variantes de maiúsculas do mesmo título
     rows = db.execute(
-        """SELECT m.imdb_id, MIN(m.original), MIN(m.year), r.rating, r.votes, GROUP_CONCAT(m.title, char(31)), MAX(m.poster)
+        """SELECT m.imdb_id, MIN(m.original), MIN(m.year), r.rating, r.votes, GROUP_CONCAT(m.title, char(31)), MAX(m.poster), MAX(m.elenco)
            FROM matches m LEFT JOIN ratings r ON r.tconst = m.imdb_id
            WHERE m.imdb_id IS NOT NULL
              AND EXISTS (SELECT 1 FROM airings a WHERE a.title = m.title AND a.start >= ?)
@@ -566,7 +597,7 @@ def collect_films(db, now):
         (since,),
     ).fetchall()
     films = []
-    for imdb, original, year, rating, votes, titles, poster in rows:
+    for imdb, original, year, rating, votes, titles, poster, elenco in rows:
         titles = titles.split("\x1f")
         # título a mostrar: o que não é versão dobrada, sem o sufixo
         title = VP_RE.sub("", sorted(titles, key=lambda t: (bool(VP_RE.search(t)), t))[0])
@@ -579,7 +610,7 @@ def collect_films(db, now):
             )
         ]
         films.append(dict(title=title, original=original, year=year, rating=rating, votes=votes,
-                          imdb=imdb, airings=airings, rank=len(films), poster=poster))
+                          imdb=imdb, airings=airings, rank=len(films), poster=poster, elenco=elenco))
     return films
 
 
@@ -654,6 +685,9 @@ def film_item(f, airings, kind, now):
     key = search_key(f["title"])
     if search_key(orig) not in ("", key):
         key += " " + search_key(orig)
+    names = [n for n in (f["elenco"] or "").split("|") if n and n != NO_ELENCO]
+    cast_attr = f" data-cast='{html.escape('|'.join(names))}'" if names else ""   # o elenco todo, para a pesquisa
+    cast_line = f"<p class='cast'>Com {', '.join(html.escape(n) for n in names[:3])}</p>" if names else ""
     url = poster_url(f["poster"])
     poster = (
         f"<div class='poster'><img src='{url}' alt='' width='185' height='278' loading='lazy' decoding='async'></div>"
@@ -661,9 +695,9 @@ def film_item(f, airings, kind, now):
         else "<div class='poster none'></div>"
     )
     return (
-        f"<li class='film' data-film='{f['imdb']}' data-rank='{f['rank']}' data-search='{key}'>{score}"
+        f"<li class='film' data-film='{f['imdb']}' data-rank='{f['rank']}' data-search='{key}'{cast_attr}>{score}"
         f"<div class='head'><h3><a href='https://www.imdb.com/title/{f['imdb']}/'>{html.escape(f['title'])}</a>{year}</h3>"
-        f"{orig_html}</div>{poster}<ul class='airings'>{''.join(lines)}</ul></li>"
+        f"{orig_html}{cast_line}</div>{poster}<ul class='airings'>{''.join(lines)}</ul></li>"
     )
 
 
@@ -776,6 +810,7 @@ def main():
     load_ratings(db)
     match_titles(db)
     fill_posters(db)
+    fill_elenco(db)
     report(db)
     export_state(db)
     write_stamp()

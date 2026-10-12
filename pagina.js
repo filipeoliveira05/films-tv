@@ -2,7 +2,7 @@
    Cada emissão traz o início e o fim absolutos (data-start / data-end, em segundos UTC).
    Ao abrir, e de minuto a minuto, recalcula em que secção está cada emissão, o prazo e a "fita",
    e atualiza as contagens. Sem JavaScript a página continua certa à hora a que foi gerada.
-   Pesquisa: o campo da barra filtra os filmes (e os títulos sem correspondência) por nome.
+   Pesquisa: o campo da barra filtra os filmes (e os títulos sem correspondência) por título ou ator.
    Para testar: ?t=<milissegundos> simula outra hora e ?q=<texto> abre já com uma pesquisa. */
 (() => {
   "use strict";
@@ -33,6 +33,10 @@
     return s;
   };
 
+  // pesquisa: todas as palavras escritas têm de aparecer no data-search (título e título original).
+  // A normalização (sem acentos nem maiúsculas, pontuação como espaço) é a mesma de search_key() em Python.
+  const key = (text) =>
+    text.normalize("NFKD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
   // guarda os filmes (um "molde" sem emissões) e as emissões que a página trouxe
   const films = new Map();
   const airings = [];
@@ -42,7 +46,15 @@
     if (!f) {
       const shell = li.cloneNode(true);
       shell.querySelector(".airings").replaceChildren();
-      f = { rank: Number(li.dataset.rank), shell, search: li.dataset.search || "", airings: [] };
+      const cast = li.dataset.cast ? li.dataset.cast.split("|") : [];
+      f = {
+        rank: Number(li.dataset.rank),
+        shell,
+        search: li.dataset.search || "",
+        cast, // elenco todo, em ordem de crédito
+        castKeys: cast.map(key),
+        airings: [],
+      };
       films.set(id, f);
     }
     li.querySelectorAll(".airing").forEach((el) => {
@@ -60,12 +72,32 @@
   });
   const ordered = [...films.values()].sort((x, y) => x.rank - y.rank);
 
-  // pesquisa: todas as palavras escritas têm de aparecer no data-search (título e título original).
-  // A normalização (sem acentos nem maiúsculas, pontuação como espaço) é a mesma de search_key() em Python.
-  const key = (text) =>
-    text.normalize("NFKD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
   let tokens = [];
   const matches = (haystack) => tokens.every((t) => haystack.includes(t));
+
+  // ator: todas as palavras têm de estar no MESMO nome ("tom hanks" não apanha Tom Cruise + Colin Hanks)
+  const actorHits = (f) =>
+    tokens.length ? f.castKeys.flatMap((k, i) => (tokens.every((t) => k.includes(t)) ? [i] : [])) : [];
+
+  // linha "Com ...": os 3 primeiros, mais (até 3) os atores que casaram; os que casaram a negrito
+  const paintCast = (li, f, hits) => {
+    const line = li.querySelector(".cast");
+    if (!line) return;
+    const shown = [...new Set([0, 1, 2, ...hits.filter((i) => i > 2).slice(0, 3)])]
+      .filter((i) => i < f.cast.length)
+      .sort((x, y) => x - y);
+    line.replaceChildren("Com ");
+    shown.forEach((i, n) => {
+      if (n) line.append(", ");
+      if (hits.includes(i)) {
+        const mark = document.createElement("mark");
+        mark.textContent = f.cast[i];
+        line.append(mark);
+      } else {
+        line.append(f.cast[i]);
+      }
+    });
+  };
 
   // "Sem correspondência" também se filtra, e abre-se sozinha se tiver resultados (fecha ao limpar)
   const details = document.querySelector("details");
@@ -124,10 +156,12 @@
       list.replaceChildren();
       let count = 0;
       ordered.forEach((f) => {
-        if (!matches(f.search)) return;
+        const hits = actorHits(f);
+        if (!matches(f.search) && !hits.length) return;
         const mine = f.airings.filter((a) => a.state === sid).sort((x, y) => x.start - y.start);
         if (!mine.length) return;
         const li = f.shell.cloneNode(true);
+        paintCast(li, f, hits);
         li.querySelector(".airings").append(...mine.map((a) => a.el));
         list.append(li);
         count += 1;

@@ -244,6 +244,9 @@ h3 a {
 h3 a:hover { text-decoration-color: currentColor; }
 .y { color: var(--dim); font-weight: 400; }
 .orig { margin: 0.15rem 0 0; color: var(--dim); font-size: 0.85rem; }
+.cast { margin: 0.15rem 0 0; color: var(--dim); font-size: 0.85rem; }
+/* ator que casou com a pesquisa */
+.cast mark { color: var(--ink); background: none; font-weight: 700; text-decoration: underline; text-underline-offset: 0.18em; }
 
 /* ---- emissões ---- */
 .airings {
