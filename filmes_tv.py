@@ -644,6 +644,15 @@ ICONS = {
     "vir": "<svg viewBox='0 0 12 12' aria-hidden='true'><path d='M0 1l6 5-6 5zM6 1l6 5-6 5z'/></svg>",
 }
 HIDDEN = " hidden"
+# olho (visto), marcador (guardar) e olho riscado (ocultar vistos); preenchem-se quando premidos (ver estilo.css)
+MARK_ICONS = {
+    "eye": "<svg viewBox='0 0 24 24' aria-hidden='true' data-icon='eye'><path fill-rule='evenodd' "
+           "d='M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12zM12 9a3 3 0 100 6 3 3 0 000-6z'/></svg>",
+    "bookmark": "<svg viewBox='0 0 24 24' aria-hidden='true' data-icon='bookmark'><path d='M6 3h12v18l-6-4-6 4z'/></svg>",
+    "eye-off": "<svg viewBox='0 0 24 24' aria-hidden='true' data-icon='eye-off'><path fill-rule='evenodd' "
+               "d='M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12zM12 9a3 3 0 100 6 3 3 0 000-6z'/>"
+               "<path d='M3 3l18 18'/></svg>",
+}
 FONTS = "https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,100..900&display=swap"
 
 
@@ -694,8 +703,16 @@ def film_item(f, airings, kind, now):
         if url
         else "<div class='poster none'></div>"
     )
+    marks = (
+        "<div class='marks' hidden>"
+        "<button type='button' class='mark seen' data-mark='visto' aria-pressed='false' "
+        f"aria-label='Marcar como visto' title='Já vi'>{MARK_ICONS['eye']}</button>"
+        "<button type='button' class='mark save' data-mark='guardado' aria-pressed='false' "
+        f"aria-label='Guardar para gravar' title='Guardar'>{MARK_ICONS['bookmark']}</button></div>"
+    )
     return (
-        f"<li class='film' data-film='{f['imdb']}' data-rank='{f['rank']}' data-search='{key}'{cast_attr}>{score}"
+        f"<li class='film' data-film='{f['imdb']}' data-rank='{f['rank']}' data-search='{key}'{cast_attr}>"
+        f"<div class='side'>{score}{marks}</div>"
         f"<div class='head'><h3><a href='https://www.imdb.com/title/{f['imdb']}/'>{html.escape(f['title'])}</a>{year}</h3>"
         f"{orig_html}{cast_line}</div>{poster}<ul class='airings'>{''.join(lines)}</ul></li>"
     )
@@ -754,15 +771,20 @@ def report(db, now=None, stamp=None):
             for sid, name, _, items in built
         )
         + "</div>"
-        + "<div class='find' hidden><input type='search' id='q' placeholder='Pesquisar filme, ator' "
+        + "<div class='find' hidden><div class='field'><input type='search' id='q' placeholder='Pesquisar filme, ator' "
         "aria-label='Pesquisar filme, ator' autocomplete='off' spellcheck='false' enterkeyhint='search'>"
         "<button type='button' class='clear' aria-label='Limpar pesquisa' hidden>&times;</button></div>"
-        "</div></nav>",
+        "<button type='button' class='tool' id='f-guardados' aria-pressed='false' "
+        f"aria-label='Mostrar só os guardados' title='Guardados'>{MARK_ICONS['bookmark']}<b class='n'>0</b></button>"
+        "<button type='button' class='tool' id='f-vistos' aria-pressed='false' "
+        f"aria-label='Ocultar vistos' title='Ocultar vistos'>{MARK_ICONS['eye-off']}<b class='n'>0</b></button>"
+        "</div></div></nav>",
         "<main class='wrap'>",
     ]
     notice = history_notice(db, now)
     if notice:
         parts.append(f"<p class='aviso'>{notice}</p>")
+    parts.append("<p class='nota' hidden></p>")   # o script preenche-a no modo "Guardados"
     for sid, name, intro, items in built:
         # "A dar agora" fica escondida (não ausente) quando vazia: o script pode mostrá-la ao longo do dia
         parts.append(

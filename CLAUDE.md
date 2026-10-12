@@ -42,7 +42,7 @@ Achados do HTML real: cada programa é um `div.channel_data` com a hora em `<b>H
 
 ## Design da página
 
-Conceito: o menu no ecrã (OSD) de um gravador: fundo azul de "sem sinal", texto branco, ponto vermelho de REC, verde de PLAY. Cada cor tem um só significado (vermelho = gravar/urgente, verde = a dar agora, ouro = rating >= 8). Tipo: Archivo variável (Google Fonts, eixo de largura: condensado nos títulos, expandido nos ratings). Elemento central: a "fita", barra por emissão que mostra a fração da janela de 7 dias que ainda resta (vermelha se faltar menos de 1 dia). Funciona sem JavaScript (o script só acrescenta o recálculo ao longo do dia e a pesquisa). Pensado primeiro para telemóvel; "Sem correspondência" vem recolhida. Para ver alterações, gerar a página e fotografá-la com o Chromium headless do Playwright (`~/.cache/ms-playwright`).
+Conceito: o menu no ecrã (OSD) de um gravador: fundo azul de "sem sinal", texto branco, ponto vermelho de REC, verde de PLAY. Cada cor tem um só significado (vermelho = gravar/urgente, verde = a dar agora, ouro = rating >= 8). Tipo: Archivo variável (Google Fonts, eixo de largura: condensado nos títulos, expandido nos ratings). Elemento central: a "fita", barra por emissão que mostra a fração da janela de 7 dias que ainda resta (vermelha se faltar menos de 1 dia). Funciona sem JavaScript (o script só acrescenta o recálculo ao longo do dia, a pesquisa e as marcas). Pensado primeiro para telemóvel; "Sem correspondência" vem recolhida. Para ver alterações, gerar a página e fotografá-la com o Chromium headless do Playwright (`~/.cache/ms-playwright`).
 
 **Página viva:** o HTML é gerado uma vez por dia (06:00), mas `pagina.js` (embutido) recalcula no browser, ao abrir e de minuto a minuto, em que secção está cada emissão ("A dar agora", "Para gravar", "A vir"), os "faltam/em", a fita, o estado urgente e as contagens, a partir de `data-start`/`data-end` (segundos UTC; `epoch()` converte a hora de Lisboa). Sem JavaScript a página continua certa à hora da geração. Para testar outra hora: `?t=<milissegundos>` no endereço. Verificado a comparar o JS com o gerador Python (oráculo) em 7 horas simuladas. O aviso de histórico incompleto e a hora "Atualizado" são estáticos (da geração).
 
@@ -52,7 +52,22 @@ Campo "Pesquisar filme, ator" na segunda linha da barra fixa (só aparece com Ja
 
 Como está feito: `search_key()` (Python) normaliza o texto e `film_item` põe-no em `data-search` (também nos `<li>` de "Sem correspondência"); `pagina.js` normaliza o que se escreve da mesma forma e filtra dentro do `render()` (por isso convive com o recálculo de minuto a minuto). O elenco completo (decisão do utilizador, contra a recomendação de top 10) está em `matches.elenco` (`Nome|Nome|...` em ordem de crédito; `-` = o TMDB não tem), vem do TMDB no matching (`append_to_response=credits`, sem pedido extra) ou de `fill_elenco` (`/find` + `/movie/<id>/credits`, 2 pedidos por filme) para os já identificados, e vai para a página em `data-cast` (nomes originais, escapados; o `pagina.js` normaliza-os uma vez ao carregar). Custo medido numa amostra de 25 filmes: mediana de 45 nomes (3 a 85), ~650 bytes por filme. **A pesquisa por canal** é diferente: é um filtro por **emissão** (mostrar só as emissões desse canal), não por filme, e precisa do seu próprio desenho. Fora de âmbito por agora: realce do texto, pesquisa aproximada, ordenação por relevância.
 
-Verificação (fora do repo): oráculo em Python que calcula, a partir do `data-search`, o que cada pesquisa deve devolver, comparado com o DOM do Chromium headless (`?q=`), mais o caminho de escrever no campo e de limpar. `content-visibility: auto` nas linhas baixou a reconstrução da lista inteira (mais de mil filmes) de ~400 ms para ~70 ms em desktop; em telemóvel real não medido.
+Verificação: `tools/verificar_pesquisa.py` (oráculo em Python que calcula, a partir do `data-search` e do `data-cast`, o que cada pesquisa deve devolver, comparado com o DOM do Chromium headless via `?q=`, mais o caminho de escrever no campo e de limpar). `content-visibility: auto` nas linhas baixou a reconstrução da lista inteira (mais de mil filmes) de ~400 ms para ~70 ms em desktop; em telemóvel real não medido.
+
+## Marcas: visto e guardado
+
+Cada filme tem dois botões na coluna do rating: **olho** (já vi) e **marcador** (guardar para gravar). As marcas são **por filme** (ID do IMDb), por isso valem em todas as secções onde o filme aparece, e guardam-se **só neste browser** (`localStorage`, chave `filmes-tv:marcas`, `{v:1, guardados, vistos, ocultarVistos}`): telemóvel e computador não partilham, e limpar os dados do browser apaga-as. Sem armazenamento (modo privado) valem só enquanto a página está aberta. Há sincronização entre separadores abertos (evento `storage`).
+- **Visto:** a linha fica a ~55% de opacidade e o poster a preto e branco; os botões ficam nítidos. O filme continua na lista.
+- **Guardados:** botão com marcador e contagem ao lado do campo de pesquisa. Premido, a página mostra só os guardados, nas mesmas três secções (com prazo e fita) e combinável com a pesquisa; "Sem correspondência" esconde-se (não tem ID, não se pode guardar). A contagem e o filtro só consideram filmes com alguma emissão na página; se houver guardados sem emissão, aparece a nota "N guardados já não estão disponíveis (reaparecem se voltarem a passar)". O modo não se guarda entre visitas.
+- **Ocultar vistos:** botão com olho riscado e a contagem de vistos. Esconde os vistos das listas; **a preferência guarda-se**. Marcar como visto com isto ligado faz o filme desaparecer logo (não há anular; desliga o filtro para o ver).
+- Os dois botões de filtro estão na linha do campo de pesquisa (e não nos atalhos, que com 4 itens deixavam de caber em 390 px).
+- Não implementado: exportar/importar, sincronizar entre dispositivos, anular, marcar vários de uma vez.
+
+O servidor só gera os botões (escondidos até o JS os mostrar); o resto está no `pagina.js` dentro do `render()`. O HTML cru cresce ~0,6 MB (botões repetidos) mas comprimido fica igual.
+
+## Verificação no browser (`tools/`)
+
+Precisam do Chromium do Playwright (`~/.cache/ms-playwright`) e do `filmes.db` local; não fazem parte do `unittest`. Cada script compara o JS da página com um oráculo em Python e termina com código 1 se falhar: `tools/verificar_horas.py` (recálculo de secções, prazos e fitas em 7 horas simuladas), `tools/verificar_pesquisa.py` (título, ator, "Sem correspondência", escrever e limpar), `tools/verificar_marcas.py` (visto, guardar, filtros, persistência, nota, localStorage bloqueado, separadores). `tools/capturar.py` tira capturas da página (telemóvel por omissão; `--q`, `--css`, `--marcar`, `--vistos`, `--ocultar`, `--guardados-modo`). `tools/_nav.py` é a base comum. **Antes isto vivia no scratchpad e perdeu-se; manter aqui.**
 
 ## Posters
 
@@ -73,6 +88,7 @@ Cada filme mostra o poster à direita (no telemóvel as emissões ocupam a largu
 - `estilo.css` e `pagina.js`: o estilo e o script da página; são embutidos em `filmes.html` pelo `report` (a página continua num só ficheiro).
 - `tests/`: testes (`python -m unittest discover -s tests`).
 - `dev.py`: servidor local com recarregamento automático, só para desenvolvimento.
+- `tools/`: verificações no browser e captura de ecrã (ver "Verificação no browser").
 - `data/`: `airings.csv` e `matches.csv`, o estado guardado no repo.
 - `filmes.db`: SQLite (tabelas `airings`, `matches`, `ratings`). Gerado.
 - `title.ratings.tsv.gz`: cache do dataset IMDb. Gerado.
@@ -146,7 +162,8 @@ O Cinemundo foi retirado de propósito. Não voltar a acrescentar.
 10. ~~Avisar quando a janela de 7 dias está incompleta~~ — feito (`history_notice`).
 11. ~~Pesquisa por nome e por ator~~ — feita (ver "Pesquisa"). Por fazer: pesquisa por canal.
 12. Podar `matches` sem nenhuma emissão há muito tempo (proposta: 90 dias; se o filme voltar, volta a ser identificado). Adiada por decisão do utilizador. Agora pesa mais: o elenco acrescenta ~650 bytes por linha de `data/matches.csv`, que nunca é podada.
-13. Opcional: filtro de votos mínimos (para evitar notas altas com poucos votos), filtros por canal/rating na página.
+13. ~~Marcas de visto e guardado, filtro Guardados e Ocultar vistos~~ — feitas (ver "Marcas"). Por fazer, se fizer falta: exportar/importar as marcas (limpar o browser apaga-as), anular ao marcar visto com "ocultar" ligado.
+14. Opcional: filtro de votos mínimos (para evitar notas altas com poucos votos), filtros por canal/rating na página.
 
 ## Convenções
 

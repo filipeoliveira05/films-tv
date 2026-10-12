@@ -3,6 +3,8 @@
    Ao abrir, e de minuto a minuto, recalcula em que secção está cada emissão, o prazo e a "fita",
    e atualiza as contagens. Sem JavaScript a página continua certa à hora a que foi gerada.
    Pesquisa: o campo da barra filtra os filmes (e os títulos sem correspondência) por título ou ator.
+   Marcas: cada filme tem um botão de visto (olho) e um de guardar (marcador). Guardam-se neste browser
+   (localStorage), por filme. "Guardados" mostra só os guardados; "Ocultar vistos" esconde os vistos.
    Para testar: ?t=<milissegundos> simula outra hora e ?q=<texto> abre já com uma pesquisa. */
 (() => {
   "use strict";
@@ -48,6 +50,7 @@
       shell.querySelector(".airings").replaceChildren();
       const cast = li.dataset.cast ? li.dataset.cast.split("|") : [];
       f = {
+        id,
         rank: Number(li.dataset.rank),
         shell,
         search: li.dataset.search || "",
@@ -74,6 +77,77 @@
 
   let tokens = [];
   const matches = (haystack) => tokens.every((t) => haystack.includes(t));
+
+  // ---- marcas (guardados e vistos): guardam-se por filme neste browser; sem armazenamento valem só nesta sessão
+  const KEY = "filmes-tv:marcas";
+  const marks = { guardados: new Set(), vistos: new Set(), ocultarVistos: false };
+  let guardadosMode = false; // só mostra os guardados (não se guarda entre visitas)
+  let lastAvailable = new Set(); // filmes com alguma emissão na página, na última renderização
+
+  const loadMarks = () => {
+    try {
+      const raw = JSON.parse(localStorage.getItem(KEY) || "null");
+      marks.guardados = new Set((raw && raw.guardados) || []);
+      marks.vistos = new Set((raw && raw.vistos) || []);
+      marks.ocultarVistos = Boolean(raw && raw.ocultarVistos);
+    } catch (e) {
+      /* sem armazenamento ou dados inválidos: fica como está */
+    }
+  };
+
+  const saveMarks = () => {
+    try {
+      localStorage.setItem(
+        KEY,
+        JSON.stringify({ v: 1, guardados: [...marks.guardados], vistos: [...marks.vistos], ocultarVistos: marks.ocultarVistos })
+      );
+    } catch (e) {
+      /* modo privado ou armazenamento cheio: a marca vale só enquanto a página está aberta */
+    }
+  };
+
+  // um filme aparece se passar os filtros de marcas e a pesquisa (título ou ator)
+  const visible = (f, hits) => {
+    if (guardadosMode && !marks.guardados.has(f.id)) return false;
+    if (marks.ocultarVistos && marks.vistos.has(f.id)) return false;
+    return matches(f.search) || hits.length > 0;
+  };
+
+  const paintMarks = (li, id) => {
+    const saved = marks.guardados.has(id);
+    const seen = marks.vistos.has(id);
+    li.classList.toggle("is-saved", saved);
+    li.classList.toggle("is-seen", seen);
+    li.querySelector(".mark.save").setAttribute("aria-pressed", String(saved));
+    li.querySelector(".mark.seen").setAttribute("aria-pressed", String(seen));
+    li.querySelector(".marks").hidden = false; // sem JavaScript os botões nem aparecem
+  };
+
+  // botões de filtro (contagem = filmes marcados que ainda têm alguma emissão) e nota dos que já não estão disponíveis
+  const toolG = document.getElementById("f-guardados");
+  const toolV = document.getElementById("f-vistos");
+  const nota = document.querySelector(".nota");
+  const setTool = (btn, n, pressed) => {
+    btn.querySelector(".n").textContent = n;
+    btn.querySelector(".n").hidden = n === 0;
+    btn.setAttribute("aria-pressed", String(pressed));
+  };
+  const updateTools = () => {
+    const have = (set) => [...set].filter((id) => lastAvailable.has(id)).length;
+    const nG = have(marks.guardados);
+    setTool(toolG, nG, guardadosMode);
+    setTool(toolV, have(marks.vistos), marks.ocultarVistos);
+    const missing = marks.guardados.size - nG;
+    if (guardadosMode && missing > 0) {
+      nota.textContent =
+        missing === 1
+          ? "1 guardado já não está disponível (reaparece se voltar a passar)"
+          : `${missing} guardados já não estão disponíveis (reaparecem se voltarem a passar)`;
+      nota.hidden = false;
+    } else {
+      nota.hidden = true;
+    }
+  };
 
   // ator: todas as palavras têm de estar no MESMO nome ("tom hanks" não apanha Tom Cruise + Colin Hanks)
   const actorHits = (f) =>
@@ -104,6 +178,8 @@
   let openedBySearch = false;
   const filterUnmatched = () => {
     if (!details) return;
+    details.hidden = guardadosMode; // títulos sem correspondência não têm ID: não se podem guardar
+    if (guardadosMode) return;
     const items = [...details.querySelectorAll("ul > li")];
     let n = 0;
     items.forEach((li) => {
@@ -151,17 +227,19 @@
       a.state = state(a, now);
       paint(a, now);
     });
+    lastAvailable = new Set(ordered.filter((f) => f.airings.some((a) => a.state)).map((f) => f.id));
     SECTIONS.forEach((sid) => {
       const list = document.querySelector(`#${sid} .films`);
       list.replaceChildren();
       let count = 0;
       ordered.forEach((f) => {
         const hits = actorHits(f);
-        if (!matches(f.search) && !hits.length) return;
+        if (!visible(f, hits)) return;
         const mine = f.airings.filter((a) => a.state === sid).sort((x, y) => x.start - y.start);
         if (!mine.length) return;
         const li = f.shell.cloneNode(true);
         paintCast(li, f, hits);
+        paintMarks(li, f.id);
         li.querySelector(".airings").append(...mine.map((a) => a.el));
         list.append(li);
         count += 1;
@@ -170,7 +248,7 @@
       section.querySelector("h2 .count").textContent = count;
       const empty = section.querySelector(".empty");
       empty.hidden = count > 0;
-      empty.textContent = tokens.length ? "Nenhum resultado" : "Nada de momento.";
+      empty.textContent = tokens.length ? "Nenhum resultado" : guardadosMode ? "Nenhum guardado aqui" : "Nada de momento.";
       const link = document.querySelector(`.jump a[href="#${sid}"]`);
       link.querySelector("b").textContent = count;
       if (sid === "agora") {
@@ -178,6 +256,7 @@
         link.hidden = count === 0;
       }
     });
+    updateTools();
     filterUnmatched();
   };
 
@@ -187,6 +266,41 @@
     if (airings.some((a) => state(a, now) !== a.state)) render(now);
     else airings.forEach((a) => paint(a, now));
   };
+
+  loadMarks();
+
+  // um clique num botão de uma linha marca o filme em todas as secções onde aparece
+  document.addEventListener("click", (e) => {
+    const btn = e.target.closest(".mark");
+    if (!btn) return;
+    const id = btn.closest(".film").dataset.film;
+    const seen = btn.dataset.mark === "visto";
+    const set = seen ? marks.vistos : marks.guardados;
+    if (!set.delete(id)) set.add(id);
+    saveMarks();
+    if ((seen && marks.ocultarVistos) || (!seen && guardadosMode)) {
+      render(clock()); // o filme sai da lista
+    } else {
+      document.querySelectorAll(`.film[data-film="${id}"]`).forEach((li) => paintMarks(li, id));
+      updateTools();
+    }
+  });
+  toolG.addEventListener("click", () => {
+    guardadosMode = !guardadosMode;
+    render(clock());
+  });
+  toolV.addEventListener("click", () => {
+    marks.ocultarVistos = !marks.ocultarVistos;
+    saveMarks();
+    render(clock());
+  });
+  // outra aba do mesmo browser alterou as marcas
+  window.addEventListener("storage", (e) => {
+    if (e.key === KEY || e.key === null) {
+      loadMarks();
+      render(clock());
+    }
+  });
 
   const find = document.querySelector(".find");
   if (find) {

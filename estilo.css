@@ -87,7 +87,8 @@ h1 {
 
 
 /* ---- pesquisa (só aparece com JavaScript) ---- */
-.find { position: relative; margin-bottom: 0.65rem; }
+.find { display: flex; gap: 0.5rem; margin-bottom: 0.65rem; }
+.find .field { position: relative; flex: 1; min-width: 0; }
 
 .find input {
   width: 100%;
@@ -122,9 +123,59 @@ h1 {
 }
 
 .clear:hover, .clear:focus-visible { color: var(--ink); }
+
+/* botões de filtro: Guardados e Ocultar vistos. Premidos ficam invertidos (claro sobre escuro). */
+.tool {
+  position: relative;
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 2.6rem;
+  padding: 0;
+  color: var(--dim);
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.tool svg, .mark svg {
+  width: 1.3rem;
+  height: 1.3rem;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+.tool:hover, .tool:focus-visible { color: var(--ink); }
+.tool:focus-visible, .mark:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+.tool[aria-pressed="true"] { color: var(--screen); background: var(--ink); border-color: var(--ink); }
+.tool[aria-pressed="true"] svg[data-icon="bookmark"] { fill: currentColor; }
+
+/* contagem sobre o botão */
+.tool .n {
+  position: absolute;
+  top: -0.45rem;
+  right: -0.4rem;
+  min-width: 1.15rem;
+  height: 1.15rem;
+  padding: 0 0.3rem;
+  display: grid;
+  place-items: center;
+  font-size: 0.68rem;
+  font-weight: 600;
+  line-height: 1;
+  color: var(--ink);
+  background: var(--deep);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  font-variant-numeric: tabular-nums;
+}
 .jump a:hover, .jump a:focus-visible { background: rgba(255, 255, 255, 0.08); }
 .jump b { color: var(--dim); font-weight: 500; font-variant-numeric: tabular-nums; }
-.jump svg, h2 svg { width: 0.85em; height: 0.85em; flex: none; fill: currentColor; }
+.links svg, h2 svg { width: 0.85em; height: 0.85em; flex: none; fill: currentColor; }   /* ícones dos atalhos e das secções */
 
 /* ---- aviso ---- */
 .aviso {
@@ -132,6 +183,14 @@ h1 {
   padding: 0.8rem 1rem;
   background: var(--deep);
   border-left: 4px solid var(--gold);
+  font-size: 0.9rem;
+}
+
+.nota {
+  margin: 1.6rem 0 0;
+  padding: 0.7rem 1rem;
+  background: var(--deep);
+  border-left: 4px solid var(--dim);
   font-size: 0.9rem;
 }
 
@@ -187,7 +246,7 @@ h2 .count {
   border-bottom: 1px solid var(--line);
 }
 
-.score { grid-area: score; }
+.side { grid-area: score; display: flex; flex-direction: column; align-items: flex-start; gap: 0.5rem; }
 .head { grid-area: head; }
 .airings { grid-area: air; }
 
@@ -247,6 +306,31 @@ h3 a:hover { text-decoration-color: currentColor; }
 .cast { margin: 0.15rem 0 0; color: var(--dim); font-size: 0.85rem; }
 /* ator que casou com a pesquisa */
 .cast mark { color: var(--ink); background: none; font-weight: 700; text-decoration: underline; text-underline-offset: 0.18em; }
+
+/* botões de visto e de guardar, por baixo do rating */
+.marks { display: flex; flex-direction: column; gap: 0.1rem; margin-left: -0.5rem; }
+
+.mark {
+  display: grid;
+  place-items: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  padding: 0;
+  color: var(--dim);
+  background: none;
+  border: 0;
+  border-radius: 8px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.mark:hover { color: var(--ink); background: rgba(255, 255, 255, 0.08); }
+.mark[aria-pressed="true"] { color: var(--ink); }
+.mark[aria-pressed="true"] svg { fill: currentColor; }      /* o olho fica preenchido com a pupila vazada */
+
+/* já visto: a linha esbate-se e o poster fica a preto e branco; os botões ficam sempre nítidos */
+.film.is-seen .score, .film.is-seen .head, .film.is-seen .poster, .film.is-seen .airings { opacity: 0.55; }
+.film.is-seen .poster img { filter: grayscale(1); }
 
 /* ---- emissões ---- */
 .airings {
