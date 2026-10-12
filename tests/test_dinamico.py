@@ -57,7 +57,7 @@ class ContratoTest(unittest.TestCase):
         self.assertIn("data-end-label='22:00'", self.html)
 
     def test_filmes_com_id_e_ordem_por_rating(self):
-        m = re.findall(r"<li class='film' data-film='(tt\d)' data-rank='(\d+)'>", self.html)
+        m = re.findall(r"<li class='film' data-film='(tt\d)' data-rank='(\d+)'[^>]*>", self.html)
         ranks = {i: int(r) for i, r in m}
         self.assertLess(ranks["tt2"], ranks["tt1"])      # Beta (8.0) vem antes de Alfa (7.0)
 

@@ -108,6 +108,18 @@ def norm(s):
     return re.sub(r"[^a-z0-9]", "", s.lower())
 
 
+def search_key(text):
+    """Texto pesquisável: sem acentos nem maiúsculas, pontuação como espaço.
+
+    O pagina.js normaliza o que se escreve da mesma forma; qualquer coisa que se queira poder
+    pesquisar (hoje título e título original; mais tarde atores) entra no data-search a partir daqui.
+    """
+    if not text:
+        return ""
+    plain = "".join(c for c in unicodedata.normalize("NFKD", text) if not unicodedata.combining(c)).lower()
+    return re.sub(r"[^a-z0-9]+", " ", plain).strip()
+
+
 # ---------------------------------------------------------------- scraping
 def discover_slugs():
     soup = BeautifulSoup(get(f"{BASE}/programacao-tv/mais-canais/"), "html.parser")
@@ -616,6 +628,9 @@ def film_item(f, airings, kind, now):
     year = f" <span class='y'>({f['year']})</span>" if f["year"] else ""
     orig = f['original'] or ""
     orig_html = f"<p class='orig'>{html.escape(orig)}</p>" if orig and norm(orig) != norm(f["title"]) else ""
+    key = search_key(f["title"])
+    if search_key(orig) not in ("", key):
+        key += " " + search_key(orig)
     url = poster_url(f["poster"])
     poster = (
         f"<div class='poster'><img src='{url}' alt='' width='185' height='278' loading='lazy' decoding='async'></div>"
@@ -623,7 +638,7 @@ def film_item(f, airings, kind, now):
         else "<div class='poster none'></div>"
     )
     return (
-        f"<li class='film' data-film='{f['imdb']}' data-rank='{f['rank']}'>{score}"
+        f"<li class='film' data-film='{f['imdb']}' data-rank='{f['rank']}' data-search='{key}'>{score}"
         f"<div class='head'><h3><a href='https://www.imdb.com/title/{f['imdb']}/'>{html.escape(f['title'])}</a>{year}</h3>"
         f"{orig_html}</div>{poster}<ul class='airings'>{''.join(lines)}</ul></li>"
     )
@@ -675,13 +690,17 @@ def report(db, now=None, stamp=None):
         "<body>",
         "<header class='top'><div class='wrap'><h1>Filmes na TV</h1>"
         f"<p>Ordenados por rating IMDb.</p><p class='stamp'>Atualizado {fmt_when(stamp or now)}</p></div></header>",
-        "<nav class='jump' aria-label='Secções'><div class='wrap'>"
+        "<nav class='jump' aria-label='Secções'><div class='wrap'><div class='links'>"
         + "".join(
             f"<a href='#{sid}'{HIDDEN if sid == 'agora' and not items else ''}>"
             f"<span class='i-{sid}'>{ICONS[sid]}</span>{name} <b>{len(items)}</b></a>"
             for sid, name, _, items in built
         )
-        + "</div></nav>",
+        + "</div>"
+        + "<div class='find' hidden><input type='search' id='q' placeholder='Pesquisar filme' "
+        "aria-label='Pesquisar filme' autocomplete='off' spellcheck='false' enterkeyhint='search'>"
+        "<button type='button' class='clear' aria-label='Limpar pesquisa' hidden>&times;</button></div>"
+        "</div></nav>",
         "<main class='wrap'>",
     ]
     notice = history_notice(db, now)
@@ -702,7 +721,7 @@ def report(db, now=None, stamp=None):
         parts.append(
             "<details><summary><h2><span class='name'>Sem correspondência</span>"
             f"<span class='count'>{len(unmatched)}</span></h2></summary><ul>"
-            + "".join(f"<li>{html.escape(t)}</li>" for (t,) in unmatched)
+            + "".join(f"<li data-search='{search_key(t)}'>{html.escape(t)}</li>" for (t,) in unmatched)
             + "</ul></details>"
         )
     parts.append("</main>")

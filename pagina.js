@@ -2,7 +2,8 @@
    Cada emissão traz o início e o fim absolutos (data-start / data-end, em segundos UTC).
    Ao abrir, e de minuto a minuto, recalcula em que secção está cada emissão, o prazo e a "fita",
    e atualiza as contagens. Sem JavaScript a página continua certa à hora a que foi gerada.
-   Para testar outra hora: acrescentar ?t=<milissegundos> ao endereço. */
+   Pesquisa: o campo da barra filtra os filmes (e os títulos sem correspondência) por nome.
+   Para testar: ?t=<milissegundos> simula outra hora e ?q=<texto> abre já com uma pesquisa. */
 (() => {
   "use strict";
   const WEEK = 7 * 86400e3;
@@ -41,7 +42,7 @@
     if (!f) {
       const shell = li.cloneNode(true);
       shell.querySelector(".airings").replaceChildren();
-      f = { rank: Number(li.dataset.rank), shell, airings: [] };
+      f = { rank: Number(li.dataset.rank), shell, search: li.dataset.search || "", airings: [] };
       films.set(id, f);
     }
     li.querySelectorAll(".airing").forEach((el) => {
@@ -58,6 +59,37 @@
     });
   });
   const ordered = [...films.values()].sort((x, y) => x.rank - y.rank);
+
+  // pesquisa: todas as palavras escritas têm de aparecer no data-search (título e título original).
+  // A normalização (sem acentos nem maiúsculas, pontuação como espaço) é a mesma de search_key() em Python.
+  const key = (text) =>
+    text.normalize("NFKD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+  let tokens = [];
+  const matches = (haystack) => tokens.every((t) => haystack.includes(t));
+
+  // "Sem correspondência" também se filtra, e abre-se sozinha se tiver resultados (fecha ao limpar)
+  const details = document.querySelector("details");
+  let openedBySearch = false;
+  const filterUnmatched = () => {
+    if (!details) return;
+    const items = [...details.querySelectorAll("ul > li")];
+    let n = 0;
+    items.forEach((li) => {
+      const ok = matches(li.dataset.search || "");
+      li.hidden = !ok;
+      if (ok) n += 1;
+    });
+    details.querySelector("summary .count").textContent = tokens.length ? n : items.length;
+    if (tokens.length && n > 0) {
+      if (!details.open) {
+        details.open = true;
+        openedBySearch = true;
+      }
+    } else if (openedBySearch) {
+      details.open = false;
+      openedBySearch = false;
+    }
+  };
 
   // segunda linha da emissão: fita (para gravar), hora de fim (agora) ou quanto falta (a vir)
   const paint = (a, now) => {
@@ -92,6 +124,7 @@
       list.replaceChildren();
       let count = 0;
       ordered.forEach((f) => {
+        if (!matches(f.search)) return;
         const mine = f.airings.filter((a) => a.state === sid).sort((x, y) => x.start - y.start);
         if (!mine.length) return;
         const li = f.shell.cloneNode(true);
@@ -101,7 +134,9 @@
       });
       const section = document.getElementById(sid);
       section.querySelector("h2 .count").textContent = count;
-      section.querySelector(".empty").hidden = count > 0;
+      const empty = section.querySelector(".empty");
+      empty.hidden = count > 0;
+      empty.textContent = tokens.length ? "Nenhum resultado" : "Nada de momento.";
       const link = document.querySelector(`.jump a[href="#${sid}"]`);
       link.querySelector("b").textContent = count;
       if (sid === "agora") {
@@ -109,6 +144,7 @@
         link.hidden = count === 0;
       }
     });
+    filterUnmatched();
   };
 
   // de minuto a minuto: se alguma emissão mudou de secção, refaz tudo; senão só atualiza os tempos
@@ -118,7 +154,39 @@
     else airings.forEach((a) => paint(a, now));
   };
 
-  render(clock());
+  const find = document.querySelector(".find");
+  if (find) {
+    const input = find.querySelector("input");
+    const clear = find.querySelector(".clear");
+    const apply = () => {
+      tokens = key(input.value).split(" ").filter(Boolean);
+      clear.hidden = input.value === "";
+      render(clock());
+    };
+    let timer;
+    input.addEventListener("input", () => {
+      clearTimeout(timer);
+      timer = setTimeout(apply, 120);
+    });
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") {
+        input.value = "";
+        apply();
+      } else if (e.key === "Enter") {
+        input.blur(); // fecha o teclado no telemóvel
+      }
+    });
+    clear.addEventListener("click", () => {
+      input.value = "";
+      apply();
+      input.focus();
+    });
+    input.value = new URLSearchParams(location.search).get("q") || "";
+    find.hidden = false; // sem JavaScript o campo nem aparece
+    apply();
+  } else {
+    render(clock());
+  }
   setInterval(update, 60000);
   document.addEventListener("visibilitychange", () => {
     if (!document.hidden) update();

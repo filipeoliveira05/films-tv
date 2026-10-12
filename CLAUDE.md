@@ -46,6 +46,14 @@ Conceito: o menu no ecrã (OSD) de um gravador: fundo azul de "sem sinal", texto
 
 **Página viva:** o HTML é gerado uma vez por dia (06:00), mas `pagina.js` (embutido) recalcula no browser, ao abrir e de minuto a minuto, em que secção está cada emissão ("A dar agora", "Para gravar", "A vir"), os "faltam/em", a fita, o estado urgente e as contagens, a partir de `data-start`/`data-end` (segundos UTC; `epoch()` converte a hora de Lisboa). Sem JavaScript a página continua certa à hora da geração. Para testar outra hora: `?t=<milissegundos>` no endereço. Verificado a comparar o JS com o gerador Python (oráculo) em 7 horas simuladas. O aviso de histórico incompleto e a hora "Atualizado" são estáticos (da geração).
 
+## Pesquisa
+
+Campo "Pesquisar filme" na segunda linha da barra fixa (só aparece com JavaScript). Filtra no sítio, nas três secções, com as contagens (atalhos e títulos) a refletir o resultado; "A dar agora" esconde-se se ficar vazia. "Sem correspondência" também se filtra e abre-se sozinha se tiver resultados (fecha ao limpar). Todas as palavras escritas têm de aparecer, sem acentos nem maiúsculas, no título em português **ou** no original. Esc ou ✕ limpa; `?q=texto` no endereço abre já com uma pesquisa.
+
+Como está feito: `search_key()` (Python) normaliza o texto e `film_item` põe-no em `data-search` (também nos `<li>` de "Sem correspondência"); `pagina.js` normaliza o que se escreve da mesma forma e filtra dentro do `render()` (por isso convive com o recálculo de minuto a minuto). **Para pesquisar mais coisas, acrescentar o texto ao `data-search`** em `film_item`: o ator exige guardar o elenco do TMDB (coluna nova em `matches`/CSV, como se fez com `poster`). O canal é diferente: é um filtro por **emissão** (mostrar só as emissões desse canal), não por filme, e precisa do seu próprio desenho. Fora de âmbito por agora: realce do texto, pesquisa aproximada, ordenação por relevância.
+
+Verificação (fora do repo): oráculo em Python que calcula, a partir do `data-search`, o que cada pesquisa deve devolver, comparado com o DOM do Chromium headless (`?q=`), mais o caminho de escrever no campo e de limpar. `content-visibility: auto` nas linhas baixou a reconstrução da lista inteira (mais de mil filmes) de ~400 ms para ~70 ms em desktop; em telemóvel real não medido.
+
 ## Posters
 
 Cada filme mostra o poster à direita (no telemóvel as emissões ocupam a largura toda por baixo; em ecrã largo ficam ao lado). Vêm do TMDB: `matches.poster` guarda o `poster_path` (preenchido no matching, ou por `fill_posters` via `/find/<imdb_id>` para os já identificados) e a página liga diretamente a `image.tmdb.org/t/p/w185` (`loading=lazy`, sem guardar imagens no repo). `-` em `poster` = o TMDB não tem poster (não voltar a perguntar); sem poster aparece um retângulo vazio com a mesma proporção. Os termos do TMDB exigem atribuição também para imagens: rodapé com logótipo e texto. O push em modo "só página" mostra posters porque estão em `data/matches.csv`.
@@ -136,7 +144,8 @@ O Cinemundo foi retirado de propósito. Não voltar a acrescentar.
 8. ~~Podar `airings` com mais de ~8 dias~~ — feito (`prune`, `KEEP_DAYS` = 8, chamada em `main()` depois do scraping; os `matches` não são podados).
 9. ~~GitHub Actions + Pages~~ — feito e executado com sucesso à mão em 2026-10-05 (secret, Pages com Source = GitHub Actions e permissões de escrita já configurados). Falta confirmar o cron automático e o commit de dados pelo bot.
 10. ~~Avisar quando a janela de 7 dias está incompleta~~ — feito (`history_notice`).
-11. Opcional: filtro de votos mínimos (para evitar notas altas com poucos votos), filtros por canal/rating na página.
+11. ~~Pesquisa por nome~~ — feita (ver "Pesquisa"). Por fazer: pesquisa por ator e por canal.
+12. Opcional: filtro de votos mínimos (para evitar notas altas com poucos votos), filtros por canal/rating na página.
 
 ## Convenções
 

@@ -18,7 +18,7 @@
 [hidden] { display: none !important; }
 
 html {
-  scroll-padding-top: 3.4rem;
+  scroll-padding-top: 6.4rem;   /* altura da barra fixa (atalhos + pesquisa) */
   -webkit-text-size-adjust: 100%;
 }
 
@@ -65,7 +65,8 @@ h1 {
   border-bottom: 1px solid var(--line);
 }
 
-.jump .wrap {
+.jump .links {
+  margin-left: -0.6rem;         /* alinha o texto do primeiro atalho visível com o campo */
   display: flex;
   gap: 0.2rem;
   overflow-x: auto;
@@ -84,7 +85,43 @@ h1 {
   white-space: nowrap;
 }
 
-.jump a:first-child { margin-left: -0.6rem; }
+
+/* ---- pesquisa (só aparece com JavaScript) ---- */
+.find { position: relative; margin-bottom: 0.65rem; }
+
+.find input {
+  width: 100%;
+  padding: 0.5rem 2.4rem 0.5rem 0.8rem;
+  font: inherit;
+  font-size: 1rem;              /* 16 px: o iPhone não amplia a página ao tocar no campo */
+  color: var(--ink);
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.find input::placeholder { color: var(--dim); }
+.find input::-webkit-search-cancel-button { display: none; }   /* usamos o nosso botão */
+.find input:focus-visible { outline: 2px solid var(--gold); outline-offset: 1px; }
+
+.clear {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 2.4rem;
+  height: 100%;
+  padding: 0;
+  font-size: 1.5rem;
+  line-height: 1;
+  color: var(--dim);
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+
+.clear:hover, .clear:focus-visible { color: var(--ink); }
 .jump a:hover, .jump a:focus-visible { background: rgba(255, 255, 255, 0.08); }
 .jump b { color: var(--dim); font-weight: 500; font-variant-numeric: tabular-nums; }
 .jump svg, h2 svg { width: 0.85em; height: 0.85em; flex: none; fill: currentColor; }
@@ -138,6 +175,8 @@ h2 .count {
 }
 
 .film {
+  content-visibility: auto;      /* o browser salta o layout das linhas fora do ecrã (a lista tem mais de mil) */
+  contain-intrinsic-size: auto 9rem;
   display: grid;
   grid-template-columns: 4.3rem minmax(0, 1fr) 3.7rem;
   grid-template-areas:
