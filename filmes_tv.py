@@ -95,11 +95,29 @@ session = requests.Session()
 session.headers["User-Agent"] = "filmes-tv-pessoal/0.1"
 
 
+RETRY_WAITS = (5, 15)     # segundos de espera entre tentativas, só quando o pedido falha por rede ou 5xx
+
+
+def _transitory(e):
+    """Falhas que valem a pena repetir: rede, timeout, erros do servidor. Um 404 não passa a existir ao repetir."""
+    if isinstance(e, (requests.ConnectionError, requests.Timeout)):
+        return True
+    status = getattr(getattr(e, "response", None), "status_code", None)
+    return status is not None and status >= 500
+
+
 def get(url):
     time.sleep(REQUEST_DELAY)
-    r = session.get(url, timeout=30)
-    r.raise_for_status()
-    return r.text
+    for wait in (*RETRY_WAITS, None):
+        try:
+            r = session.get(url, timeout=30)
+            r.raise_for_status()
+            return r.text
+        except requests.RequestException as e:
+            if wait is None or not _transitory(e):
+                raise
+            print(f"! {url}: {type(e).__name__}; nova tentativa em {wait} s", file=sys.stderr)
+            time.sleep(wait)
 
 
 def norm(s):
@@ -122,8 +140,13 @@ def search_key(text):
 
 # ---------------------------------------------------------------- scraping
 def discover_slugs():
-    soup = BeautifulSoup(get(f"{BASE}/programacao-tv/mais-canais/"), "html.parser")
     found = {}
+    try:
+        soup = BeautifulSoup(get(f"{BASE}/programacao-tv/mais-canais/"), "html.parser")
+    except requests.RequestException as e:
+        # os slugs já estão em KNOWN_SLUGS; esta página só serve para descobrir canais novos
+        print(f"! sem a página de canais ({type(e).__name__}); uso os slugs conhecidos", file=sys.stderr)
+        soup = BeautifulSoup("", "html.parser")
     for a in soup.find_all("a", href=True):
         m = re.fullmatch(rf"(?:{re.escape(BASE)})?/programacao-tv/([a-z0-9-]+)/", a["href"])
         if not m:
