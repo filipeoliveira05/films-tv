@@ -22,7 +22,7 @@ Limitação a ter presente: a página mostra o que passou na grelha, não o que 
 - Resultado final: página no **GitHub Pages** (`filmes.html`), aberta no telemóvel através de um marcador.
 - `TMDB_API_KEY` guardada como *secret* do repositório, nunca no código.
 - Persistência entre execuções (decidido: no repo): `data/airings.csv` e `data/matches.csv` (ordenados, gerados por `export_state`, lidos por `import_state`); o Actions faz commit deles. O dataset de ratings do IMDb não se guarda; volta a ser descarregado em cada execução (~8 MB comprimidos). Decisão A sobre os termos do site: repo e página públicos com a grelha, assumido pelo utilizador.
-- Cron diário às 05:00 UTC (06:00 Lisboa no verão, 05:00 no inverno), em `.github/workflows/atualizar.yml`. Se nenhum canal for lido, o script falha de propósito em vez de publicar dados antigos. Página: https://filipeoliveira05.github.io/films-tv/
+- Cron diário às 05:17 UTC (06:17 Lisboa no verão, 05:17 no inverno; minuto fora de hora cheia por causa dos atrasos, mudado em 2026-10-12 — por confirmar se melhora), em `.github/workflows/atualizar.yml`. Se nenhum canal for lido, o script falha de propósito em vez de publicar dados antigos. Página: https://filipeoliveira05.github.io/films-tv/
 
 ## Estado atual
 

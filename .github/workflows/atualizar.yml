@@ -2,8 +2,9 @@ name: Atualizar filmes
 
 on:
   schedule:
-    # 05:00 UTC = 06:00 em Lisboa no verão (WEST) e 05:00 no inverno (WET). O GitHub pode atrasar alguns minutos.
-    - cron: "0 5 * * *"
+    # 05:17 UTC = 06:17 em Lisboa no verão (WEST) e 05:17 no inverno (WET). Minuto fora de hora cheia de
+    # propósito: o GitHub congestiona as horas cheias e a execução das 05:00 chegou a começar por volta das 11:30.
+    - cron: "17 5 * * *"
   workflow_dispatch:
     inputs:
       so_pagina:
