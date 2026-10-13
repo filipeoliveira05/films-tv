@@ -51,7 +51,7 @@ if r:
     s = r["r"]
     R.ok("comutador visível", s["comutador"])
     R.ok("vista Tierlist ativa e grelha escondida", s["vista"] == "tier" and s["tvOculto"] and not s["tierOculto"])
-    R.ok("tiers S A B C D", [t["nome"] for t in s["tiers"]] == list("SABCD"), str(s["tiers"]))
+    R.ok("tiers 10 9 8 7 6", [t["nome"] for t in s["tiers"]] == ["10", "9", "8", "7", "6"], str(s["tiers"]))
     R.ok("nada por classificar", s["livres"] == [] and s["vazio"])
 
 r = cena("S1b  abrir na grelha e alternar", cenario="""
@@ -92,7 +92,7 @@ for nome, valor in (("texto solto", "isto não é json"), ("versão errada", '{"
     r = cena(f"S4  localStorage corrompido ({nome})", query="?v=tierlist", pre=f"try {{ localStorage.setItem('{K}', {json.dumps(valor)}); }} catch (e) {{}}",
              cenario="return snap();")
     if r:
-        R.ok("abre com os tiers por omissão", [t["nome"] for t in r["r"]["tiers"]] == list("SABCD"))
+        R.ok("abre com os tiers por omissão", [t["nome"] for t in r["r"]["tiers"]] == ["10", "9", "8", "7", "6"])
 
 # ---- S5: visto sem metadados (Review Focus 3)
 r = cena("S5  visto que já não está na grelha e sem metadados", query="?v=tierlist",
@@ -174,7 +174,7 @@ if r:
     R.ok("+ tier acrescenta uma linha", len(p["novo"]["tiers"]) == 6 and p["novo"]["tiers"][5]["id"] == "t6")
     R.ok("reordenar um tier", [t["id"] for t in p["ordem"]["tiers"]][0] == "t3", str([t["id"] for t in p["ordem"]["tiers"]]))
     R.ok("apagar um tier com filmes devolve-os a por classificar", p["apagado"]["livres"] == [A] and len(p["apagado"]["tiers"]) == 5, str(p["apagado"]))
-    R.ok("sair da edição mostra nomes simples", p["fim"]["tiers"][1]["nome"] in list("SABCD") + ["Novo", "Obras-primas"])
+    R.ok("sair da edição mostra nomes simples", p["fim"]["tiers"][1]["nome"] in ["10", "9", "8", "7", "6", "Novo", "Obras-primas"])
     R.ok("tudo persistiu ao recarregar", [t["id"] for t in x["tiers"]] == [t["id"] for t in p["fim"]["tiers"]]
          and any(t["nome"] == "Obras-primas" for t in x["tiers"]), str(x["tiers"]))
 

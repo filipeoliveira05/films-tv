@@ -6,7 +6,8 @@ const TierEstado = (() => {
   const VERSAO = 1;
   // sem vermelho nem ouro: são reservados a "gravar" e ao rating
   const PALETA = ["#ff9f43", "#ff7eb6", "#b48cff", "#6fa8ff", "#5ee0e0", "#b8e65a", "#b4bccf", "#8ff0cf"];
-  const NOMES = ["S", "A", "B", "C", "D"];
+  // rampa fria do melhor (lima) ao pior (roxo); sem vermelho nem ouro
+  const PADRAO = [["10", "#b8e65a"], ["9", "#8ff0cf"], ["8", "#5ee0e0"], ["7", "#6fa8ff"], ["6", "#b48cff"]];
   const MAX_NOME = 24;
   const IMG = "https://image.tmdb.org/t/p/";
 
@@ -14,7 +15,7 @@ const TierEstado = (() => {
 
   const novo = () => ({
     v: VERSAO,
-    tiers: NOMES.map((nome, i) => ({ id: `t${i + 1}`, nome, cor: PALETA[i % PALETA.length] })),
+    tiers: PADRAO.map(([nome, cor], i) => ({ id: `t${i + 1}`, nome, cor })),
     itens: {},
     filmes: {},
   });
@@ -87,7 +88,9 @@ const TierEstado = (() => {
 
   const adicionarTier = (s, nome = "Novo") => {
     const r = copia(s);
-    r.tiers.push({ id: novoId(s), nome: nome.trim().slice(0, MAX_NOME) || "Novo", cor: PALETA[s.tiers.length % PALETA.length] });
+    // a primeira cor da paleta que nenhum tier usa; só repete quando estão todas em uso
+    const livre = PALETA.find((c) => !s.tiers.some((t) => t.cor === c)) || PALETA[s.tiers.length % PALETA.length];
+    r.tiers.push({ id: novoId(s), nome: nome.trim().slice(0, MAX_NOME) || "Novo", cor: livre });
     return r;
   };
 

@@ -43,7 +43,7 @@ depois = "<script>setTimeout(() => document.getElementById('f-guardados').click(
 if a.tierlist_demo:
     filmes = {i: {"titulo": f"Filme {n}", "ano": "2000", "poster": None} for n, i in enumerate(ids)}
     tiers = [{"id": f"t{k}", "nome": nome, "cor": cor} for k, (nome, cor) in enumerate(
-        zip("SABCD", ["#ff9f43", "#ff7eb6", "#b48cff", "#6fa8ff", "#5ee0e0"]), 1)]
+        zip(["10", "9", "8", "7", "6"], ["#b8e65a", "#8ff0cf", "#5ee0e0", "#6fa8ff", "#b48cff"]), 1)]
     itens = {i: {"tier": f"t{1 + n % 5}", "pos": n // 5} for n, i in enumerate(ids[:12])}
     filmes = {i: m for i, m in filmes.items() if i in itens}
     pre += f"try {{ localStorage.setItem('filmes-tv:tierlist', {json.dumps(json.dumps({'v': 1, 'tiers': tiers, 'itens': itens, 'filmes': filmes}))}); }} catch (e) {{}}"

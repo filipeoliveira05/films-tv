@@ -5,9 +5,10 @@ const T = require("../../tierlist_estado.js");
 const M = (titulo, ano = "2000") => ({ titulo, ano, poster: "https://image.tmdb.org/t/p/w185/x.jpg" });
 const com = (...filmes) => filmes.reduce((s, [id, t]) => T.adicionar(s, id, M(t)), T.novo());
 
-test("novo: tiers S A B C D com ids t1..t5, cores da paleta e nada dentro", () => {
+test("novo: tiers 10 9 8 7 6 com ids t1..t5, cores da paleta e nada dentro", () => {
   const s = T.novo();
-  assert.deepEqual(s.tiers.map((t) => t.nome), ["S", "A", "B", "C", "D"]);
+  assert.deepEqual(s.tiers.map((t) => t.nome), ["10", "9", "8", "7", "6"]);
+  assert.deepEqual(s.tiers.map((t) => t.cor), ["#b8e65a", "#8ff0cf", "#5ee0e0", "#6fa8ff", "#b48cff"]);
   assert.deepEqual(s.tiers.map((t) => t.id), ["t1", "t2", "t3", "t4", "t5"]);
   assert.ok(s.tiers.every((t) => T.PALETA.includes(t.cor)));
   assert.deepEqual(s.itens, {});
@@ -120,6 +121,18 @@ test("adicionarTier usa a próxima cor da paleta e um id novo", () => {
   assert.ok(T.PALETA.includes(t.cor));
 });
 
+test("adicionarTier escolhe a primeira cor da paleta que ainda não está em uso", () => {
+  let s = T.novo();
+  const usadas = new Set(s.tiers.map((t) => t.cor));
+  s = T.adicionarTier(s);
+  const nova = s.tiers[5].cor;
+  assert.ok(T.PALETA.includes(nova) && !usadas.has(nova), nova);
+  s = T.adicionarTier(T.adicionarTier(s));
+  assert.equal(new Set(s.tiers.map((t) => t.cor)).size, 8); // oito tiers, oito cores diferentes
+  s = T.adicionarTier(s);
+  assert.ok(T.PALETA.includes(s.tiers[8].cor)); // com a paleta toda em uso, volta a repetir
+});
+
 test("adicionarTier não reutiliza ids de tiers apagados", () => {
   let s = T.novo();
   s = T.apagarTier(s, "t5");
@@ -160,8 +173,8 @@ test("apagar todos os tiers deixa tudo em 'por classificar'", () => {
 
 test("moverTier reordena as linhas", () => {
   const s = T.moverTier(T.novo(), "t4", 0);
-  assert.deepEqual(s.tiers.map((t) => t.nome), ["C", "S", "A", "B", "D"]);
-  assert.deepEqual(T.moverTier(T.novo(), "t1", 99).tiers.map((t) => t.nome), ["A", "B", "C", "D", "S"]);
+  assert.deepEqual(s.tiers.map((t) => t.nome), ["7", "10", "9", "8", "6"]);
+  assert.deepEqual(T.moverTier(T.novo(), "t1", 99).tiers.map((t) => t.nome), ["9", "8", "7", "6", "10"]);
   assert.equal(T.moverTier(T.novo(), "t99", 0).tiers.length, 5);
 });
 
