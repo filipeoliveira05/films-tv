@@ -126,9 +126,11 @@ const arrastar = async (card, destino, dx = 20, dy = 20) => {
     button: 0, buttons: tipo === 'pointerup' ? 0 : 1, pointerId: 1, pointerType: 'mouse', isPrimary: true }));
   const x0 = r.x + r.width / 2, y0 = r.y + r.height / 2, x1 = d.x + dx, y1 = d.y + dy;
   ev('pointerdown', x0, y0, card);
-  for (let i = 1; i <= 6; i++) { ev('pointermove', x0 + (x1 - x0) * i / 6, y0 + (y1 - y0) * i / 6, document); await wait(40); }
-  await wait(300); ev('pointermove', x1, y1, document); await wait(300);   // deixa as animações do Sortable acabarem
-  ev('pointerup', x1, y1, document);
+  for (let i = 1; i <= 12; i++) { ev('pointermove', x0 + (x1 - x0) * i / 12, y0 + (y1 - y0) * i / 12, document); await wait(60); }
+  // o Sortable ignora movimentos para as mesmas coordenadas e durante as animações: mexe-se um pouco dentro do destino
+  for (const [dx2, dy2] of [[3, 3], [6, 5], [4, 4]]) { await wait(200); ev('pointermove', x1 + dx2, y1 + dy2, document); }
+  await wait(300);
+  ev('pointerup', x1 + 4, y1 + 4, document);
   await wait(400);
 };
 """
@@ -175,5 +177,64 @@ if r:
     R.ok("sair da edição mostra nomes simples", p["fim"]["tiers"][1]["nome"] in list("SABCD") + ["Novo", "Obras-primas"])
     R.ok("tudo persistiu ao recarregar", [t["id"] for t in x["tiers"]] == [t["id"] for t in p["fim"]["tiers"]]
          and any(t["nome"] == "Obras-primas" for t in x["tiers"]), str(x["tiers"]))
+
+# ---- S10: pesquisa TMDB com fetch simulado (nunca toca na rede nem usa uma chave real)
+MOCK = """
+window.__pedidos = [];
+window.fetch = async (url) => {
+  const u = new URL(url); window.__pedidos.push(u.pathname + u.search.replace(/api_key=[^&]*/, 'api_key=X'));
+  const chave = u.searchParams.get('api_key');
+  const resp = (status, corpo) => ({ ok: status < 400, status, json: async () => corpo });
+  if (chave === 'RUIM') return resp(401, { status_message: 'Invalid API key' });
+  if (chave === 'REDE') throw new TypeError('Failed to fetch');
+  if (u.pathname.endsWith('/search/movie')) return resp(200, { results: [
+    { id: 11, title: 'Filme Um', release_date: '1999-05-01', poster_path: '/a.jpg' },
+    { id: 12, title: 'Sem Imdb', release_date: '2001-01-01', poster_path: null } ] });
+  if (u.pathname.endsWith('/movie/11/external_ids')) return resp(200, { imdb_id: 'tt0000011' });
+  if (u.pathname.endsWith('/movie/12/external_ids')) return resp(200, { imdb_id: null });
+  return resp(404, {});
+};
+"""
+PROCURAR = """
+const procurar = async (txt) => { const q = $('#tl-q'); q.value = txt; q.dispatchEvent(new Event('input', { bubbles: true })); await wait(700); };
+const estadoBusca = () => ({ chave: !$('#tl-chave').hidden, msg: $('#tl-msg').hidden ? null : $('#tl-msg').textContent,
+  res: $$('#tl-resultados li').map((l) => l.textContent), pedidos: [...window.__pedidos], guardada: localStorage.getItem('filmes-tv:tmdb-chave') });
+"""
+r = cena("S10a  pesquisa sem chave pede a chave", query="?v=tierlist", pre=MOCK, cenario=PROCURAR + """
+  await procurar('filme'); const semChave = estadoBusca();
+  $('#tl-chave-input').value = 'BOA'; await click($('#tl-chave-ok'));
+  await procurar('filme'); return { semChave, comChave: estadoBusca() };""")
+if r:
+    x = r["r"]
+    R.ok("sem chave não faz pedidos e mostra o campo da chave", x["semChave"]["chave"] and x["semChave"]["pedidos"] == [], str(x["semChave"]))
+    R.ok("guarda a chave neste browser", x["comChave"]["guardada"] == "BOA" and not x["comChave"]["chave"])
+    R.ok("mostra os resultados", len(x["comChave"]["res"]) == 2 and "Filme Um" in x["comChave"]["res"][0], str(x["comChave"]["res"]))
+    R.ok("a pesquisa usa pt-PT", any("language=pt-PT" in p for p in x["comChave"]["pedidos"]))
+
+r = cena("S10b  escolher um resultado", query="?v=tierlist", pre=MOCK + "localStorage.setItem('filmes-tv:tmdb-chave','BOA');", cenario=PROCURAR + """
+  await procurar('filme');
+  await click($$('#tl-resultados button')[0]); await wait(300);
+  const aposAdicionar = { s: snap(), marcas: localStorage.getItem('filmes-tv:marcas'), busca: estadoBusca() };
+  await procurar('filme'); await click($$('#tl-resultados button')[0]); await wait(300);
+  const duplicado = estadoBusca();
+  await procurar('filme'); await click($$('#tl-resultados button')[1]); await wait(300);
+  return { aposAdicionar, duplicado, semImdb: estadoBusca(), final: snap() };""")
+if r:
+    x = r["r"]
+    R.ok("o filme entra em por classificar", x["aposAdicionar"]["s"]["livres"] == ["tt0000011"], str(x["aposAdicionar"]["s"]["livres"]))
+    R.ok("fica marcado como visto", "tt0000011" in json.loads(x["aposAdicionar"]["marcas"])["vistos"])
+    R.ok("repetido: mensagem e nada duplicado", x["duplicado"]["msg"] and "já está" in x["duplicado"]["msg"] and x["final"]["livres"] == ["tt0000011"], str(x["duplicado"]["msg"]))
+    R.ok("sem ID do IMDb: mensagem e nada adicionado", x["semImdb"]["msg"] and "IMDb" in x["semImdb"]["msg"] and len(x["final"]["livres"]) == 1)
+
+r = cena("S10c  chave recusada (401) e sem rede", query="?v=tierlist", pre=MOCK + "localStorage.setItem('filmes-tv:tmdb-chave','RUIM');",
+         cenario=PROCURAR + """
+  await procurar('filme'); const recusada = estadoBusca();
+  localStorage.setItem('filmes-tv:tmdb-chave', 'REDE');
+  await procurar('outro'); const semRede = estadoBusca();
+  return { recusada, semRede, tiers: snap().tiers.length };""")
+if r:
+    x = r["r"]
+    R.ok("401 apaga a chave e pede outra", x["recusada"]["guardada"] is None and x["recusada"]["chave"], str(x["recusada"]))
+    R.ok("sem rede: mensagem e a tierlist continua", x["semRede"]["msg"] and "ligação" in x["semRede"]["msg"] and x["tiers"] == 5, str(x["semRede"]["msg"]))
 
 R.fim()

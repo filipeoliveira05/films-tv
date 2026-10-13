@@ -198,6 +198,117 @@
     if (!mudar(T.moverTier(estado, id, idx))) pintar();
   };
 
+  // ---- pesquisa no TMDB: a chave é do utilizador e fica só neste browser (nunca no código nem no repo)
+  const KEY_TMDB = "filmes-tv:tmdb-chave";
+  const API = "https://api.themoviedb.org/3";
+  const IMG = "https://image.tmdb.org/t/p/w185";
+  let chaveMem = ""; // se o armazenamento estiver bloqueado, vale enquanto a página está aberta
+
+  const chave = () => {
+    try {
+      return localStorage.getItem(KEY_TMDB) || chaveMem;
+    } catch (e) {
+      return chaveMem;
+    }
+  };
+  const guardarChave = (valor) => {
+    chaveMem = valor;
+    try {
+      if (valor) localStorage.setItem(KEY_TMDB, valor);
+      else localStorage.removeItem(KEY_TMDB);
+    } catch (e) {
+      /* fica só em memória */
+    }
+  };
+
+  const mensagem = (texto) => {
+    const m = $("#tl-msg");
+    m.textContent = texto || "";
+    m.hidden = !texto;
+  };
+  const pedirChave = () => {
+    $("#tl-chave").hidden = false;
+    mensagem("");
+    $("#tl-resultados").replaceChildren();
+  };
+
+  class SemChave extends Error {}
+
+  const obter = async (caminho, params = {}) => {
+    const qs = new URLSearchParams({ api_key: chave(), ...params });
+    const r = await fetch(`${API}${caminho}?${qs}`);
+    if (r.status === 401) {
+      guardarChave("");
+      pedirChave();
+      throw new SemChave();
+    }
+    if (!r.ok) throw new Error(`TMDB ${r.status}`);
+    return r.json();
+  };
+
+  const falha = (e) => {
+    if (!(e instanceof SemChave)) mensagem("Sem ligação ao TMDB. Tenta outra vez dentro de pouco tempo.");
+  };
+
+  let resultados = [];
+  let pedido = 0; // ignora respostas de pesquisas já ultrapassadas
+
+  const procurar = async (q) => {
+    const meu = ++pedido;
+    if (!q.trim()) {
+      resultados = [];
+      $("#tl-resultados").replaceChildren();
+      return mensagem("");
+    }
+    if (!chave()) return pedirChave();
+    try {
+      const d = await obter("/search/movie", { language: "pt-PT", include_adult: "false", query: q.trim() });
+      if (meu !== pedido) return;
+      resultados = (d.results || []).slice(0, 8);
+      mensagem(resultados.length ? "" : "Nenhum filme encontrado.");
+      $("#tl-resultados").replaceChildren(
+        ...resultados.map((r, i) => {
+          const li = el("li");
+          const b = botao("tl-res");
+          b.dataset.i = i;
+          if (r.poster_path) {
+            const img = new Image();
+            img.src = IMG + r.poster_path;
+            img.alt = "";
+            img.width = 46;
+            img.height = 69;
+            b.append(img);
+          }
+          b.append(el("span", "", `${r.title}${r.release_date ? ` (${r.release_date.slice(0, 4)})` : ""}`));
+          li.append(b);
+          return li;
+        })
+      );
+    } catch (e) {
+      falha(e);
+    }
+  };
+
+  const escolher = async (r) => {
+    try {
+      const d = await obter(`/movie/${r.id}/external_ids`);
+      if (!d.imdb_id) return mensagem("Este filme não tem ID do IMDb no TMDB: não dá para o adicionar.");
+      if (T.contem(estado, d.imdb_id, FT.vistos())) return mensagem(`"${r.title}" já está na tierlist.`);
+      const meta = {
+        titulo: r.title,
+        ano: r.release_date ? r.release_date.slice(0, 4) : null,
+        poster: r.poster_path ? IMG + r.poster_path : null,
+      };
+      mudar(T.adicionar(estado, d.imdb_id, meta));
+      FT.marcarVisto(d.imdb_id); // um filme na tierlist conta como visto
+      mensagem("");
+      $("#tl-q").value = "";
+      $("#tl-resultados").replaceChildren();
+    } catch (e) {
+      falha(e);
+    }
+  };
+
   root.addEventListener("click", (e) => {
     const x = e.target.closest(".tl-x");
     if (x) return soltar(x.closest(".tl-card").dataset.film, null);
@@ -215,6 +326,24 @@
   });
   $("#tl-editar").addEventListener("click", () => { editando = !editando; pintar(); });
   $("#tl-novo-tier").addEventListener("click", () => mudar(T.adicionarTier(estado)));
+
+  let timer;
+  $("#tl-q").addEventListener("input", (e) => {
+    clearTimeout(timer);
+    timer = setTimeout(() => procurar(e.target.value), 350);
+  });
+  $("#tl-resultados").addEventListener("click", (e) => {
+    const b = e.target.closest(".tl-res");
+    if (b) escolher(resultados[Number(b.dataset.i)]);
+  });
+  $("#tl-chave-ok").addEventListener("click", () => {
+    const v = $("#tl-chave-input").value.trim();
+    if (!v) return;
+    guardarChave(v);
+    $("#tl-chave-input").value = "";
+    $("#tl-chave").hidden = true;
+    procurar($("#tl-q").value);
+  });
 
   window.addEventListener("storage", (e) => {
     if (e.key === KEY || e.key === null) {
