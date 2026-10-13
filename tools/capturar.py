@@ -31,6 +31,8 @@ ap.add_argument("--ocultar", action="store_true", help="liga 'ocultar vistos'")
 ap.add_argument("--guardados-modo", action="store_true", help="abre no filtro Guardados")
 ap.add_argument("--vista", choices=["tv", "tierlist"], default="tv", help="vista a mostrar")
 ap.add_argument("--tierlist-demo", action="store_true", help="enche a tierlist com os filmes de Para gravar, repartidos pelos tiers")
+ap.add_argument("--livres", type=int, default=0, help="com --tierlist-demo: N filmes por classificar")
+ap.add_argument("--selecionar", action="store_true", help="toca no primeiro cartão do primeiro tier (mostra o ✕)")
 ap.add_argument("--editar", action="store_true", help="abre a tierlist em modo de edição")
 a = ap.parse_args()
 
@@ -41,12 +43,22 @@ marcas = {"v": 1, "guardados": ids[:a.marcar] + [f"tt000000{i}" for i in range(a
 pre = f"try {{ localStorage.setItem('filmes-tv:marcas', {json.dumps(json.dumps(marcas))}); }} catch (e) {{}}"
 depois = "<script>setTimeout(() => document.getElementById('f-guardados').click(), 200);</script>" if a.guardados_modo else ""
 if a.tierlist_demo:
-    filmes = {i: {"titulo": f"Filme {n}", "ano": "2000", "poster": None} for n, i in enumerate(ids)}
+    sopa = BeautifulSoup(html, "html.parser")
+    def meta(i, n):
+        li = sopa.select_one(f"li.film[data-film='{i}']")
+        img = li.select_one(".poster img") if li else None
+        y = li.select_one("h3 .y") if li else None
+        return {"titulo": li.select_one("h3 a").get_text() if li else f"Filme {n}", "ano": y.get_text().strip("() ") if y else None,
+                "poster": img["src"] if img else None}
+    filmes = {i: meta(i, n) for n, i in enumerate(ids[:a.livres + 14])}
     tiers = [{"id": f"t{k}", "nome": nome, "cor": cor} for k, (nome, cor) in enumerate(
         zip(["10", "9", "8", "7", "6"], ["#b8e65a", "#8ff0cf", "#5ee0e0", "#6fa8ff", "#b48cff"]), 1)]
-    itens = {i: {"tier": f"t{1 + n % 5}", "pos": n // 5} for n, i in enumerate(ids[:12])}
-    filmes = {i: m for i, m in filmes.items() if i in itens}
+    itens = {i: {"tier": f"t{1 + n % 5}", "pos": n // 5} for n, i in enumerate(ids[:14])}
+    for i in ids[14:14 + a.livres]:   # filmes por classificar (explícitos, sem tier)
+        itens[i] = {"tier": None, "pos": len(itens)}
     pre += f"try {{ localStorage.setItem('filmes-tv:tierlist', {json.dumps(json.dumps({'v': 1, 'tiers': tiers, 'itens': itens, 'filmes': filmes}))}); }} catch (e) {{}}"
+if a.selecionar:
+    depois += "<script>setTimeout(() => document.querySelector('#tl-tiers .tl-card').click(), 300);</script>"
 if a.editar:
     depois += "<script>setTimeout(() => document.getElementById('tl-editar').click(), 200);</script>"
 html = html.replace("<meta charset='utf-8'>", f"<meta charset='utf-8'><script>{pre}</script>", 1)
