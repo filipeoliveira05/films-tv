@@ -21,15 +21,15 @@ class EsqueletoDaTierlistTest(unittest.TestCase):
 
     def test_elementos_que_o_script_procura(self):
         for ident in ("tl-editar", "tl-exportar", "tl-importar", "tl-ficheiro", "tl-aviso", "tl-tiers", "tl-novo-tier",
-                      "tl-livres", "tl-vazio", "tl-q", "tl-msg", "tl-chave", "tl-chave-input", "tl-chave-ok", "tl-resultados"):
+                      "tl-livres", "tl-vazio", "tl-q", "tl-msg", "tl-chave", "tl-chave-input", "tl-chave-ok", "tl-resultados", "tl-duelos", "tl-duelos-ecra", "tl-duelos-corpo", "tl-duelos-sair"):
             self.assertIn(f"id='{ident}'", HTML, ident)
 
     def test_scripts_embutidos_pela_ordem_certa(self):
-        pos = [HTML.index(marca) for marca in ("Sortable", "const TierEstado", "window.FilmesTV", "filmes-tv:tierlist")]
+        pos = [HTML.index(marca) for marca in ("Sortable", "const TierEstado", "const TierDuelos", "window.FilmesTV", "filmes-tv:tierlist")]
         self.assertEqual(pos, sorted(pos))
 
     def test_scripts_nao_fecham_a_tag_por_engano(self):
-        for nome in ("vendor/Sortable.min.js", "tierlist_estado.js", "tierlist.js", "pagina.js"):
+        for nome in ("vendor/Sortable.min.js", "tierlist_estado.js", "tierlist_duelos.js", "tierlist.js", "pagina.js"):
             self.assertNotIn("</script", (ROOT / nome).read_text(encoding="utf-8").lower(), nome)
 
     def test_sem_chaves_no_html(self):
@@ -37,5 +37,5 @@ class EsqueletoDaTierlistTest(unittest.TestCase):
 
     def test_o_workflow_dispara_com_os_ficheiros_novos(self):
         wf = (ROOT / ".github/workflows/atualizar.yml").read_text(encoding="utf-8")
-        for ficheiro in ("tierlist.js", "tierlist_estado.js", "vendor/Sortable.min.js"):
+        for ficheiro in ("tierlist.js", "tierlist_estado.js", "tierlist_duelos.js", "vendor/Sortable.min.js"):
             self.assertIn(f"- {ficheiro}", wf)
