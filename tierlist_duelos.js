@@ -47,6 +47,9 @@ const TierDuelos = (() => {
     return r;
   };
 
+  // junta dois conjuntos de resultados (p. ex. ao importar): no mesmo par vale o segundo
+  const juntar = (a, b) => ({ ...(a || {}), ...(b || {}) });
+
   const pendentes = (res, ids) => pares(ids).filter(([a, b]) => !tem(res, a, b));
   const progresso = (res, ids) => {
     const total = pares(ids).length;
@@ -136,7 +139,7 @@ const TierDuelos = (() => {
     return r;
   };
 
-  return { chave, pares, ordemDosPares, registar, remover, pendentes, progresso, vitorias, ordenar, normalizar };
+  return { chave, pares, ordemDosPares, registar, remover, juntar, pendentes, progresso, vitorias, ordenar, normalizar };
 })();
 
 if (typeof module !== "undefined") module.exports = TierDuelos;

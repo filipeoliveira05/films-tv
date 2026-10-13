@@ -405,4 +405,45 @@ r = duelos("""
 if r:
     R.ok("todos empatados: sem aviso e 4 filmes na ordem", r["r"]["av"] is None and len(r["r"]["ordem"]) == 4 and r["r"]["n"] == 6, str(r["r"]))
 
+# ---- S20: o progresso dos duelos vai no Exportar e volta com o Importar (sem apagar os que já existem)
+PEGAR = """
+let descarregado = null;
+const criarUrl = URL.createObjectURL;
+URL.createObjectURL = (blob) => { descarregado = blob; return criarUrl.call(URL, blob); };
+const exportar = async () => { descarregado = null; await click($('#tl-exportar')); await wait(200); return descarregado ? await descarregado.text() : null; };
+"""
+r = duelos(PEGAR + """
+  await abrirTier();
+  await responder(cartas()[0]); await responder(cartas()[1]);
+  await click($('#tl-duelos-sair'));
+  const texto = await exportar();
+  const j = JSON.parse(texto);
+  const semDuelos = await (async () => { localStorage.removeItem('filmes-tv:duelos'); return null; })();
+  return { texto, chaves: Object.keys(j.duelos || {}), validos: Object.values(j.duelos || {}).every((w) => typeof w === 'string'), v: j.v };""",
+         titulo="S20  exportar leva os duelos; importar junta-os", fase2="""
+  const texto = JSON.parse(sessionStorage.getItem('r1')).texto;
+  const gravados = () => Object.keys((JSON.parse(localStorage.getItem('filmes-tv:duelos') || '{"res":{}}')).res).length;
+  window.alert = () => {}; window.confirm = () => true;
+  const antes = gravados();
+  const ok = T().importarTexto(texto); await wait(150);
+  const depoisImportar = gravados();
+  // um ficheiro antigo, sem o campo duelos, não pode apagar os duelos que já existem
+  const antigo = JSON.stringify((({ duelos, ...resto }) => resto)(JSON.parse(texto)));
+  T().importarTexto(antigo); await wait(150);
+  const depoisAntigo = gravados();
+  // duelos lixo no ficheiro são ignorados
+  const sujo = JSON.stringify({ ...JSON.parse(texto), duelos: { '__proto__': 'x', 'tt1|tt1': 'tt1', 'lixo': 'tt9' } });
+  T().importarTexto(sujo); await wait(150);
+  const depoisSujo = gravados();
+  await click($('#tl-duelos'));
+  return { antes, ok, depoisImportar, depoisAntigo, depoisSujo, t1: $('#tl-duelos-corpo .tl-dl-tier[data-tier="t1"]').textContent };""")
+if r:
+    x, f = r["r"], r["fase1"]
+    R.ok("o ficheiro exportado tem o campo duelos com os 2 resultados", len(f["chaves"]) == 2 and f["validos"] and f["v"] == 1, str(f["chaves"]))
+    R.ok("sem duelos guardados antes de importar", x["antes"] == 0, str(x["antes"]))
+    R.ok("importar traz os 2 duelos de volta", x["ok"] is True and x["depoisImportar"] == 2, str(x))
+    R.ok("o tier mostra 2/6 depois de importar", "2/6" in x["t1"], x["t1"])
+    R.ok("um ficheiro antigo (sem duelos) não apaga os que já existem", x["depoisAntigo"] == 2, str(x["depoisAntigo"]))
+    R.ok("duelos lixo no ficheiro são ignorados", x["depoisSujo"] == 2, str(x["depoisSujo"]))
+
 R.fim()

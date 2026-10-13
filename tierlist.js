@@ -552,7 +552,10 @@
   $("#tl-novo-tier").addEventListener("click", () => mudar(T.adicionarTier(estado)));
 
   const exportarFicheiro = () => {
-    const blob = new Blob([T.exportar(estado)], { type: "application/json" });
+    // os duelos já feitos vão no mesmo ficheiro (campo "duelos"), para a cópia de segurança os incluir
+    const copia = JSON.parse(T.exportar(estado));
+    if (Object.keys(duelos.res).length) copia.duelos = duelos.res;
+    const blob = new Blob([JSON.stringify(copia, null, 1)], { type: "application/json" });
     const a = el("a");
     a.href = URL.createObjectURL(blob);
     a.download = `tierlist-${new Date().toISOString().slice(0, 10)}.json`;
@@ -569,8 +572,17 @@
       alert(r.erro);
       return false;
     }
-    if (!confirm("Importar substitui a tierlist atual. Continuar?")) return false;
+    if (!confirm("Importar substitui a tierlist atual e junta os duelos do ficheiro aos que já tens. Continuar?")) return false;
     mudar(r.estado);
+    try {
+      const extra = JSON.parse(texto).duelos; // ficheiros antigos não têm este campo: ficam como estão
+      if (extra && typeof extra === "object") {
+        duelos = { ...duelos, res: DU.juntar(duelos.res, DU.normalizar({ v: 1, res: extra }).res) };
+        gravarDuelos();
+      }
+    } catch (e) {
+      /* o texto já foi validado por T.importar */
+    }
     FT.marcarVisto(...Object.keys(r.estado.itens)); // um filme na tierlist conta como visto
     return true;
   };
@@ -625,6 +637,7 @@
   document.querySelector(".views").hidden = false; // sem JavaScript o comutador nem aparece
 
   estado = ler();
+  lerDuelos(); // para o Exportar levar os duelos mesmo sem abrir o ecrã
   FT.aoMudarMarcas(sincronizar);
   sincronizar();
   vista(new URLSearchParams(location.search).get("v") === "tierlist" ? "tier" : "tv");

@@ -163,3 +163,21 @@ test("normalizar higieniza o que vem do armazenamento", () => {
   assert.deepEqual(D.normalizar(null), { v: 1, res: {} });
   assert.deepEqual(D.normalizar({ v: 2, res: { "tt1|tt2": "tt1" } }), { v: 1, res: {} });
 });
+
+test("juntar: une os resultados e, no mesmo par, vale o segundo; não muta nenhum", () => {
+  const a = D.registar(D.registar({}, "tt1", "tt2", "tt1"), "tt1", "tt3", "tt3");
+  const b = D.registar(D.registar({}, "tt1", "tt2", "tt2"), "tt2", "tt3", "=");
+  const antesA = JSON.stringify(a), antesB = JSON.stringify(b);
+  const j = D.juntar(a, b);
+  assert.deepEqual(j, { "tt1|tt2": "tt2", "tt1|tt3": "tt3", "tt2|tt3": "=" });
+  assert.equal(JSON.stringify(a), antesA);
+  assert.equal(JSON.stringify(b), antesB);
+});
+
+test("juntar com um dos lados vazio devolve o outro e aguenta valores em falta", () => {
+  const a = D.registar({}, "tt1", "tt2", "tt1");
+  assert.deepEqual(D.juntar(a, {}), a);
+  assert.deepEqual(D.juntar({}, a), a);
+  assert.deepEqual(D.juntar(undefined, a), a);
+  assert.deepEqual(D.juntar(a, null), a);
+});
