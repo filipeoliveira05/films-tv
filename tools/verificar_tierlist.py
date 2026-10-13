@@ -274,4 +274,30 @@ if r:
     R.ok("mostra o aviso de que só vale nesta sessão", x["aviso"])
     R.ok("continua a funcionar em memória", x["tier"] == 1)
 
+# ---- S13: o ✕ só aparece com hover ou ao tocar num cartão
+r = cena("S13  ✕ de remover escondido até ser preciso", query="?v=tierlist", cenario=f"""
+  window.FilmesTV.marcarVisto('{A}', '{B}'); await wait(100);
+  T().soltar('{A}', 't1', 0); T().soltar('{B}', 't1', 1); await wait(100);
+  const card = (id) => $('#tl-tiers .tl-card[data-film="' + id + '"]');
+  const est = () => ({{ sel: $$('.tl-sel').map((c) => c.dataset.film),
+    x: Object.fromEntries([['{A}', 0], ['{B}', 0]].map(([id]) => [id, getComputedStyle($('.tl-x', card(id))).opacity])) }});
+  const inicio = est();
+  await click(card('{A}')); const a = est();
+  await click(card('{B}')); const b = est();
+  await click(card('{B}')); const desmarca = est();
+  await click(card('{A}')); await click($('#tl-tiers .tl-label')); const vazio = est();
+  await click(card('{A}')); await click(document.body); const fora = est();
+  await click(card('{A}')); await click($('.tl-x', card('{A}'))); await wait(100);
+  return {{ inicio, a, b, desmarca, vazio, fora, livres: snap().livres, selDepois: est ? $$('.tl-sel').length : 0 }};""")
+if r:
+    x = r["r"]
+    R.ok("o ✕ está escondido por omissão", all(v == "0" for v in x["inicio"]["x"].values()), str(x["inicio"]))
+    R.ok("tocar num cartão seleciona-o e mostra o ✕", x["a"]["sel"] == [A] and x["a"]["x"][A] == "1" and x["a"]["x"][B] == "0", str(x["a"]))
+    R.ok("tocar noutro passa a seleção", x["b"]["sel"] == [B] and x["b"]["x"][A] == "0" and x["b"]["x"][B] == "1", str(x["b"]))
+    R.ok("tocar outra vez no mesmo desmarca", x["desmarca"]["sel"] == [])
+    R.ok("tocar na etiqueta do tier limpa a seleção", x["vazio"]["sel"] == [])
+    R.ok("tocar fora da tierlist limpa a seleção", x["fora"]["sel"] == [])
+    R.ok("o ✕ continua a devolver o filme a por classificar", x["livres"] == [A], str(x["livres"]))
+    R.ok("a seleção desaparece depois de remover", x["selDepois"] == 0)
+
 R.fim()

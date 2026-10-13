@@ -309,8 +309,22 @@
     }
   };
 
+  // tocar num cartão de um tier mostra o ✕ nele (o hover não existe no telemóvel); tocar noutro sítio esconde-o.
+  // A seleção é só visual: não entra no estado e perde-se quando a vista se repinta.
+  const selecionar = (card) => {
+    root.querySelectorAll(".tl-sel").forEach((c) => c.classList.remove("tl-sel"));
+    if (card) card.classList.add("tl-sel");
+  };
+  document.addEventListener("click", (e) => {
+    if (!root.contains(e.target)) selecionar(null);
+  });
+
   root.addEventListener("click", (e) => {
     const x = e.target.closest(".tl-x");
+    if (!x) {
+      const card = e.target.closest(".tl-card");
+      selecionar(card && card.querySelector(".tl-x") && !card.classList.contains("tl-sel") ? card : null);
+    }
     if (x) return soltar(x.closest(".tl-card").dataset.film, null);
     const tier = e.target.closest(".tl-tier");
     const cor = e.target.closest(".tl-cor");

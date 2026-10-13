@@ -552,7 +552,13 @@ footer a { color: inherit; }
   background: linear-gradient(225deg, rgba(0, 0, 0, 0.7) 40%, transparent 41%);
   border: 0;
   cursor: pointer;
+  opacity: 0;               /* escondido até ser preciso */
+  pointer-events: none;
 }
+
+/* aparece com o rato por cima, com o teclado, ou depois de tocar no cartão (.tl-sel, no telemóvel) */
+.tl-sel .tl-x, .tl-x:focus-visible { opacity: 1; pointer-events: auto; }
+@media (hover: hover) { .tl-card:hover .tl-x { opacity: 1; pointer-events: auto; } }
 
 .tl-fantasma { opacity: 0.35; }
 .tl-arrastado { z-index: 20; opacity: 0.9; box-shadow: 0 6px 18px rgba(0, 0, 0, 0.5); }
