@@ -20,6 +20,7 @@ on:
       - filmes_tv.py
       - tierlist.js
       - tierlist_estado.js
+      - tierlist_duelos.js
       - vendor/Sortable.min.js
       - .github/workflows/atualizar.yml
 

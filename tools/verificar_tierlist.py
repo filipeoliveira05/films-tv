@@ -317,4 +317,133 @@ if r:
     R.ok("a imagem não recebe o toque (o cartão é que o recebe) e o texto não se seleciona",
          x["css"]["pe"] == "none" and x["css"]["sel"] == "none" and x["cssLivre"]["pe"] == "none", str(x["css"]))
 
+# ---- S15-S19: duelos (todos os pares, ordem que minimiza contradições, ciclos, progresso, desfazer)
+IDS4 = json.dumps(ids[:4])
+PREP = """
+const ids = __IDS__;
+window.FilmesTV.marcarVisto(...ids); await wait(100);
+ids.forEach((id, i) => T().soltar(id, 't1', i)); await wait(100);
+const D = '#tl-duelos-corpo';
+const cartas = () => $$(D + ' .tl-dl-card').map((c) => c.dataset.film);
+const abrirTier = async () => { await click($('#tl-duelos')); await click($(D + ' .tl-dl-tier[data-tier="t1"]')); };
+const responder = async (ganha) => click($(D + ' .tl-dl-card[data-film="' + ganha + '"]'));
+const jogar = async (quem) => { let n = 0; while (cartas().length === 2 && n < 40) { const [a, b] = cartas(); await responder(quem(a, b)); n++; } return n; };
+const ordem = () => $$(D + ' .tl-dl-ordem li').map((li) => li.dataset.film);
+const aviso = () => ($(D + ' .tl-dl-aviso') ? $(D + ' .tl-dl-aviso').textContent : null);
+const gravados = () => Object.keys((JSON.parse(localStorage.getItem('filmes-tv:duelos') || '{"res":{}}')).res).length;
+"""
+def duelos(corpo, **kw):
+    return cena(kw.pop("titulo"), query="?v=tierlist", cenario=PREP.replace("__IDS__", IDS4) + corpo, **kw)
+
+r = duelos("""
+  const verd = [ids[2], ids[0], ids[3], ids[1]];
+  const tiersAntes = JSON.stringify(T().estado().tiers);
+  await click($('#tl-duelos'));
+  const menu = { aberto: !$('#tl-duelos-ecra').hidden, t1: $(D + ' .tl-dl-tier[data-tier="t1"]').textContent, t2: $(D + ' .tl-dl-tier[data-tier="t2"]').disabled };
+  await click($(D + ' .tl-dl-tier[data-tier="t1"]'));
+  const barra0 = $(D + ' .tl-dl-barra').textContent;
+  const feitos = await jogar((a, b) => (verd.indexOf(a) < verd.indexOf(b) ? a : b));
+  const o = ordem(), av = aviso(), n = gravados();
+  await click($('#tl-dl-aplicar'));
+  return { menu, barra0, feitos, o, av, n, fechado: $('#tl-duelos-ecra').hidden, verd,
+    t1: $$('#tl-tiers .tl-tier[data-tier="t1"] .tl-card').map((c) => c.dataset.film),
+    tiersIguais: JSON.stringify(T().estado().tiers) === tiersAntes };""", titulo="S15  duelos de um tier, ordem e aplicar")
+if r:
+    x = r["r"]
+    R.ok("o ecrã abre e mostra o tier com o progresso 0/6", x["menu"]["aberto"] and "0/6" in x["menu"]["t1"], str(x["menu"]))
+    R.ok("um tier sem filmes não deixa começar", x["menu"]["t2"] is True)
+    R.ok("o primeiro duelo diz 1 de 6", "1" in x["barra0"] and "6" in x["barra0"], x["barra0"])
+    R.ok("fez-se um duelo por cada par (6 com 4 filmes)", x["feitos"] == 6, str(x["feitos"]))
+    R.ok("a ordem sugerida é a verdadeira", x["o"] == x["verd"], str(x["o"]))
+    R.ok("sem conflitos não há aviso", x["av"] is None, str(x["av"]))
+    R.ok("os 6 resultados ficaram guardados", x["n"] == 6)
+    R.ok("aplicar fecha o ecrã e reordena o tier", x["fechado"] and x["t1"] == x["verd"], str(x["t1"]))
+    R.ok("os tiers (nomes e cores) ficam intactos", x["tiersIguais"])
+
+r = duelos("""
+  const [X, Y, Z] = ids;
+  const ciclo = { [X + Y]: X, [Y + X]: X, [Y + Z]: Y, [Z + Y]: Y, [Z + X]: Z, [X + Z]: Z };
+  await abrirTier();
+  await jogar((a, b) => ciclo[a + b] || a);
+  const antes = { av: aviso(), rever: $('#tl-dl-rever') ? $('#tl-dl-rever').textContent : null, ordem: ordem() };
+  await click($('#tl-dl-rever'));
+  const par = cartas();
+  const original = ciclo[par[0] + par[1]];
+  const perdedor = par.find((c) => c !== original);
+  await responder(perdedor);
+  const depois = { av: aviso(), rever: !!$('#tl-dl-rever'), ordem: ordem(), par };
+  return { antes, par, depois };""", titulo="S16  ciclo: ordem sugerida, rever conflitos e desfazer o ciclo")
+if r:
+    x = r["r"]
+    R.ok("o ciclo gera um aviso de contradição", x["antes"]["av"] and "1" in x["antes"]["av"], str(x["antes"]))
+    R.ok("o botão rever conflitos mostra quantos", x["antes"]["rever"] and "1" in x["antes"]["rever"], str(x["antes"]["rever"]))
+    R.ok("rever propõe só um duelo (o contradito)", len(x["par"]) == 2)
+    R.ok("depois de inverter essa resposta não há contradições", x["depois"]["av"] is None and not x["depois"]["rever"], str(x["depois"]))
+
+r = duelos("""
+  await abrirTier();
+  await responder(cartas()[0]); await responder(cartas()[1]);
+  return { n: gravados() };""", titulo="S17  progresso guardado entre visitas", fase2="""
+  await click($('#tl-duelos'));
+  return { t1: $('#tl-duelos-corpo .tl-dl-tier[data-tier="t1"]').textContent };""")
+if r:
+    R.ok("depois de recarregar o tier mostra 2/6 e continua", r["r"]["t1"] and "2/6" in r["r"]["t1"], str(r["r"]))
+
+r = duelos("""
+  await abrirTier();
+  await responder(cartas()[0]); const um = gravados();
+  await click($('#tl-dl-desfazer')); const zero = gravados();
+  return { um, zero, barra: $(D + ' .tl-dl-barra').textContent, cartas: cartas().length };""", titulo="S18  desfazer o último duelo")
+if r:
+    x = r["r"]
+    R.ok("desfazer apaga o resultado e volta ao 1.º duelo", x["um"] == 1 and x["zero"] == 0 and x["cartas"] == 2 and "1" in x["barra"], str(x))
+
+r = duelos("""
+  await abrirTier();
+  while (cartas().length === 2) await click($('#tl-dl-empate'));
+  return { av: aviso(), ordem: ordem(), n: gravados() };""", titulo="S19  empates não geram contradições")
+if r:
+    R.ok("todos empatados: sem aviso e 4 filmes na ordem", r["r"]["av"] is None and len(r["r"]["ordem"]) == 4 and r["r"]["n"] == 6, str(r["r"]))
+
+# ---- S20: o progresso dos duelos vai no Exportar e volta com o Importar (sem apagar os que já existem)
+PEGAR = """
+let descarregado = null;
+const criarUrl = URL.createObjectURL;
+URL.createObjectURL = (blob) => { descarregado = blob; return criarUrl.call(URL, blob); };
+const exportar = async () => { descarregado = null; await click($('#tl-exportar')); await wait(200); return descarregado ? await descarregado.text() : null; };
+"""
+r = duelos(PEGAR + """
+  await abrirTier();
+  await responder(cartas()[0]); await responder(cartas()[1]);
+  await click($('#tl-duelos-sair'));
+  const texto = await exportar();
+  const j = JSON.parse(texto);
+  const semDuelos = await (async () => { localStorage.removeItem('filmes-tv:duelos'); return null; })();
+  return { texto, chaves: Object.keys(j.duelos || {}), validos: Object.values(j.duelos || {}).every((w) => typeof w === 'string'), v: j.v };""",
+         titulo="S20  exportar leva os duelos; importar junta-os", fase2="""
+  const texto = JSON.parse(sessionStorage.getItem('r1')).texto;
+  const gravados = () => Object.keys((JSON.parse(localStorage.getItem('filmes-tv:duelos') || '{"res":{}}')).res).length;
+  window.alert = () => {}; window.confirm = () => true;
+  const antes = gravados();
+  const ok = T().importarTexto(texto); await wait(150);
+  const depoisImportar = gravados();
+  // um ficheiro antigo, sem o campo duelos, não pode apagar os duelos que já existem
+  const antigo = JSON.stringify((({ duelos, ...resto }) => resto)(JSON.parse(texto)));
+  T().importarTexto(antigo); await wait(150);
+  const depoisAntigo = gravados();
+  // duelos lixo no ficheiro são ignorados
+  const sujo = JSON.stringify({ ...JSON.parse(texto), duelos: { '__proto__': 'x', 'tt1|tt1': 'tt1', 'lixo': 'tt9' } });
+  T().importarTexto(sujo); await wait(150);
+  const depoisSujo = gravados();
+  await click($('#tl-duelos'));
+  return { antes, ok, depoisImportar, depoisAntigo, depoisSujo, t1: $('#tl-duelos-corpo .tl-dl-tier[data-tier="t1"]').textContent };""")
+if r:
+    x, f = r["r"], r["fase1"]
+    R.ok("o ficheiro exportado tem o campo duelos com os 2 resultados", len(f["chaves"]) == 2 and f["validos"] and f["v"] == 1, str(f["chaves"]))
+    R.ok("sem duelos guardados antes de importar", x["antes"] == 0, str(x["antes"]))
+    R.ok("importar traz os 2 duelos de volta", x["ok"] is True and x["depoisImportar"] == 2, str(x))
+    R.ok("o tier mostra 2/6 depois de importar", "2/6" in x["t1"], x["t1"])
+    R.ok("um ficheiro antigo (sem duelos) não apaga os que já existem", x["depoisAntigo"] == 2, str(x["depoisAntigo"]))
+    R.ok("duelos lixo no ficheiro são ignorados", x["depoisSujo"] == 2, str(x["depoisSujo"]))
+
 R.fim()

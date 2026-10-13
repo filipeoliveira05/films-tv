@@ -738,6 +738,7 @@ def tierlist_html():
         "<div id='h-tierlist' class='tl-titulo' role='heading' aria-level='2'>A minha tierlist</div>"
         "<div class='tl-barra'>"
         "<button type='button' class='tl-btn' id='tl-editar' aria-pressed='false'>Editar tiers</button>"
+        "<button type='button' class='tl-btn' id='tl-duelos'>Duelos</button>"
         "<button type='button' class='tl-btn' id='tl-exportar'>Exportar</button>"
         "<button type='button' class='tl-btn' id='tl-importar'>Importar</button>"
         "<input type='file' id='tl-ficheiro' accept='application/json,.json' hidden></div>"
@@ -758,6 +759,10 @@ def tierlist_html():
         "<button type='button' class='tl-btn' id='tl-chave-ok'>Guardar chave</button></div>"
         "<p class='tl-msg' id='tl-msg' role='status' hidden></p>"
         "<ul class='tl-resultados' id='tl-resultados'></ul>"
+        "<div class='tl-ecra' id='tl-duelos-ecra' role='dialog' aria-modal='true' aria-labelledby='tl-duelos-titulo' hidden>"
+        "<div class='tl-ecra-topo'><strong id='tl-duelos-titulo'>Duelos</strong>"
+        "<button type='button' class='tl-btn' id='tl-duelos-sair'>Sair</button></div>"
+        "<div class='tl-ecra-corpo' id='tl-duelos-corpo'></div></div>"
         "</main>"
     )
 
@@ -853,6 +858,7 @@ def report(db, now=None, stamp=None):
     parts.append(
         "<script>" + asset("vendor/Sortable.min.js") + "</script>"
         "<script>" + asset("tierlist_estado.js") + "</script>"
+        "<script>" + asset("tierlist_duelos.js") + "</script>"
         "<script>" + asset("pagina.js") + "</script>"
         "<script>" + asset("tierlist.js") + "</script>"
     )

@@ -592,3 +592,44 @@ footer a { color: inherit; }
 .tl-resultados { list-style: none; margin: 0.6rem 0 0; padding: 0; }
 .tl-res { display: flex; align-items: center; gap: 0.7rem; width: 100%; min-height: 3.2rem; padding: 0.3rem 0.5rem; font: inherit; color: var(--ink); text-align: left; background: none; border: 0; border-bottom: 1px solid var(--line); cursor: pointer; }
 .tl-res img { flex: none; width: 2.3rem; height: auto; border-radius: 2px; }
+
+/* ---- duelos ---- */
+body.tl-sem-scroll { overflow: hidden; }
+.tl-ecra { position: fixed; inset: 0; z-index: 30; display: flex; flex-direction: column; background: var(--screen); }
+.tl-ecra[hidden] { display: none; }
+.tl-ecra-topo { display: flex; align-items: center; justify-content: space-between; padding: 0.7rem var(--pad); background: var(--deep); border-bottom: 1px solid var(--line); }
+.tl-ecra-corpo { flex: 1; width: 100%; max-width: 46rem; margin: 0 auto; padding: var(--pad); overflow-y: auto; }
+.tl-btn:disabled { opacity: 0.4; cursor: default; }
+.tl-btn-forte { color: var(--deep); background: var(--ink); }
+
+.tl-dl-intro { margin: 0 0 1rem; color: var(--dim); }
+.tl-dl-tier { display: flex; align-items: center; gap: 0.8rem; width: 100%; min-height: 3.2rem; margin-bottom: 0.4rem; padding: 0.4rem 0.7rem; font: inherit; color: var(--ink); text-align: left; background: rgba(255, 255, 255, 0.08); border: 1px solid var(--line); border-radius: 6px; cursor: pointer; }
+.tl-dl-tier:disabled { opacity: 0.4; cursor: default; }
+.tl-dl-chip { flex: none; min-width: 3.4rem; padding: 0.25rem 0.5rem; font-weight: 800; text-align: center; color: var(--deep); border-radius: 4px; }
+.tl-dl-n { flex: 1; color: var(--dim); }
+.tl-dl-prog { font-variant-numeric: tabular-nums; }
+
+.tl-dl-barra { display: flex; align-items: center; gap: 0.8rem; margin-bottom: 0.9rem; font-weight: 600; }
+.tl-dl-trilho { flex: 1; height: 0.5rem; background: rgba(255, 255, 255, 0.15); border-radius: 999px; overflow: hidden; }
+.tl-dl-trilho i { display: block; height: 100%; background: var(--ink); }
+.tl-dl-par { display: grid; grid-template-columns: 1fr 1fr; gap: 0.8rem; }
+.tl-dl-card { display: flex; flex-direction: column; gap: 0.5rem; padding: 0.45rem; font: inherit; color: var(--ink); text-align: left; background: rgba(255, 255, 255, 0.08); border: 2px solid var(--line); border-radius: 8px; cursor: pointer; user-select: none; -webkit-touch-callout: none; }
+.tl-dl-card:hover, .tl-dl-card:focus-visible { border-color: var(--ink); }
+.tl-dl-card img { display: block; width: 100%; aspect-ratio: 2 / 3; object-fit: cover; border-radius: 4px; pointer-events: none; -webkit-user-drag: none; }
+.tl-dl-card .tl-sem { display: grid; place-items: center; aspect-ratio: 2 / 3; font-size: 1rem; text-align: center; }
+.tl-dl-titulo { font-weight: 600; line-height: 1.2; overflow-wrap: anywhere; }
+.tl-dl-acoes { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 1rem; }
+
+.tl-dl-aviso { margin: 0 0 1rem; padding: 0.6rem 0.8rem; background: rgba(255, 255, 255, 0.08); border-left: 3px solid var(--dim); }
+.tl-dl-aviso p { margin: 0 0 0.4rem; }
+.tl-dl-aviso ul { margin: 0; padding-left: 1.1rem; color: var(--dim); }
+.tl-dl-ordem { margin: 0; padding: 0; list-style: none; counter-reset: pos; }
+.tl-dl-ordem li { display: flex; align-items: center; gap: 0.7rem; padding: 0.35rem 0.4rem; border-bottom: 1px solid var(--line); border-left: 3px solid transparent; counter-increment: pos; }
+.tl-dl-ordem li::before { content: counter(pos); flex: none; width: 1.6rem; font-weight: 800; font-variant-numeric: tabular-nums; color: var(--dim); text-align: right; }
+.tl-dl-ordem li.tl-dl-conflito { border-left: 3px solid var(--dim); }
+.tl-dl-mini { flex: none; width: 2.4rem; aspect-ratio: 2 / 3; overflow: hidden; border-radius: 2px; background: rgba(255, 255, 255, 0.1); }
+.tl-dl-mini img { display: block; width: 100%; height: 100%; object-fit: cover; pointer-events: none; }
+.tl-dl-mini .tl-sem { font-size: 0.55rem; padding: 0.1rem; }
+.tl-dl-ordem .tl-dl-titulo { flex: 1; }
+.tl-dl-pontos { flex: none; color: var(--dim); font-size: 0.85rem; font-variant-numeric: tabular-nums; }
+

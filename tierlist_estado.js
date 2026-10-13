@@ -126,6 +126,18 @@ const TierEstado = (() => {
     return r;
   };
 
+  // aplica uma ordem (p. ex. a dos duelos) aos filmes de um tier: só muda as posições; quem não vem na lista fica no fim
+  const ordenarTier = (s, tier, ordem) => {
+    if (tier !== null && !s.tiers.some((t) => t.id === tier)) return s;
+    const atuais = listar(s, tier);
+    const pedida = [...new Set(ordem)].filter((id) => atuais.includes(id));
+    const nova = pedida.concat(atuais.filter((id) => !pedida.includes(id)));
+    if (nova.every((id, i) => id === atuais[i])) return s;
+    const r = copia(s);
+    nova.forEach((id, i) => { r.itens[id].pos = i; });
+    return r;
+  };
+
   // aceita só o que reconhece; o resto é descartado ou corrigido (vale também para o ficheiro importado)
   const normalizar = (raw) => {
     if (!raw || typeof raw !== "object" || Array.isArray(raw) || raw.v !== VERSAO || !Array.isArray(raw.tiers)) return null;
@@ -168,7 +180,7 @@ const TierEstado = (() => {
 
   return {
     PALETA, novo, normalizar, exportar, importar, listar, naoClassificados, contem,
-    adicionar, guardarMeta, mover, remover, adicionarTier, renomearTier, corTier, apagarTier, moverTier,
+    adicionar, guardarMeta, mover, remover, ordenarTier, adicionarTier, renomearTier, corTier, apagarTier, moverTier,
   };
 })();
 

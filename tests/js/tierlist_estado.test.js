@@ -242,3 +242,30 @@ test("normalizar renumera as posições", () => {
   assert.deepEqual(T.listar(s, "t1"), ["tt2", "tt1"]);
   assert.deepEqual([s.itens.tt2.pos, s.itens.tt1.pos], [0, 1]);
 });
+
+test("ordenarTier muda só as posições dentro do tier, na ordem dada", () => {
+  let s = com(["tt1", "Um"], ["tt2", "Dois"], ["tt3", "Três"], ["tt4", "Quatro"]);
+  for (const id of ["tt1", "tt2", "tt3"]) s = T.mover(s, id, "t2");
+  s = T.mover(s, "tt4", "t1");
+  const r = T.ordenarTier(s, "t2", ["tt3", "tt1", "tt2"]);
+  assert.deepEqual(T.listar(r, "t2"), ["tt3", "tt1", "tt2"]);
+  assert.deepEqual(T.listar(r, "t1"), ["tt4"]); // os outros tiers não mexem
+  assert.deepEqual(r.tiers, s.tiers); // tiers, nomes e cores intactos
+  assert.deepEqual(r.filmes, s.filmes);
+});
+
+test("ordenarTier ignora ids de outros tiers e duplicados, e deixa no fim os que não vêm na lista", () => {
+  let s = com(["tt1", "Um"], ["tt2", "Dois"], ["tt3", "Três"], ["tt4", "Quatro"]);
+  for (const id of ["tt1", "tt2", "tt3"]) s = T.mover(s, id, "t2");
+  s = T.mover(s, "tt4", "t1");
+  const r = T.ordenarTier(s, "t2", ["tt3", "tt4", "tt3", "tt9"]);
+  assert.deepEqual(T.listar(r, "t2"), ["tt3", "tt1", "tt2"]);
+  assert.deepEqual(T.listar(r, "t1"), ["tt4"]);
+});
+
+test("ordenarTier devolve o mesmo estado se a ordem não muda ou o tier não existe", () => {
+  let s = com(["tt1", "Um"], ["tt2", "Dois"]);
+  s = T.mover(T.mover(s, "tt1", "t2"), "tt2", "t2");
+  assert.equal(T.ordenarTier(s, "t2", ["tt1", "tt2"]), s);
+  assert.equal(T.ordenarTier(s, "t99", ["tt2", "tt1"]), s);
+});
