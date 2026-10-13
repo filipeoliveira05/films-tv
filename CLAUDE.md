@@ -42,7 +42,7 @@ Achados do HTML real: cada programa é um `div.channel_data` com a hora em `<b>H
 
 ## GitHub Actions (`.github/workflows/atualizar.yml`)
 
-- **Gatilhos:** `schedule` (cron `17 5 * * *`, UTC), `workflow_dispatch` (com opção "só página") e `push` em `main` só se mudar `estilo.css`, `pagina.js`, `filmes_tv.py` ou o próprio workflow. Os pushes do bot (só `data/`) e os de documentação não o disparam.
+- **Gatilhos:** `schedule` (cron `17 5 * * *`, UTC), `workflow_dispatch` (com opção "só página") e `push` em `main` só se mudar `estilo.css`, `pagina.js`, `filmes_tv.py`, `tierlist.js`, `tierlist_estado.js`, `vendor/Sortable.min.js` ou o próprio workflow. Os pushes do bot (só `data/`) e os de documentação não o disparam.
 - **Modo completo** (cron e disparo manual): corre os testes, `python filmes_tv.py` (scraping, matching, posters, elenco, ratings, página), faz commit de `data/` com `git pull --rebase` antes do push (aguenta pushes teus a meio) e publica no Pages. Se nenhum canal for lido, falha de propósito e não publica.
 - **Modo "só página"** (push, ou disparo manual com a opção): `python filmes_tv.py --relatorio` cria a base de dados do zero, importa `data/*.csv`, descarrega os ratings e gera a página. **Sem pedidos ao tudonumclick.com nem ao TMDB**, não precisa da chave e não faz commit. O `checkout` usa a ponta do ramo, para apanhar os dados mais recentes do bot.
 - `concurrency: filmes` (uma execução de cada vez). `data/atualizado.txt` é reescrito em cada execução completa, por isso o bot faz commit todos os dias.
@@ -74,9 +74,22 @@ Cada filme tem dois botões na coluna do rating: **olho** (já vi) e **marcador*
 
 O servidor só gera os botões (escondidos até o JS os mostrar); o resto está no `pagina.js` dentro do `render()`. O HTML cru cresce ~0,6 MB (botões repetidos) mas comprimido fica igual.
 
+## Tierlist
+
+Vista "Tierlist" na mesma página: o comutador "Na TV" / "Tierlist" fica na barra fixa (só aparece com JavaScript); `?v=tierlist` abre já nela. O utilizador ordena por arrasto os filmes que já viu em tiers personalizáveis (por omissão S, A, B, C, D). Desenho em `docs/superpowers/specs/2026-10-13-tierlist-design.md`, plano em `docs/superpowers/plans/2026-10-13-tierlist.md`.
+
+- **Dados:** `localStorage`, chave `filmes-tv:tierlist`, `{v:1, tiers:[{id,nome,cor}], itens:{<imdb_id>:{tier,pos}}, filmes:{<imdb_id>:{titulo,ano,poster}}}`. Só neste browser (como as marcas): limpar os dados do browser apaga-a; a única cópia de segurança são os botões **Exportar** / **Importar** (JSON; importar pede confirmação, substitui a tierlist e marca os filmes importados como vistos). Os metadados ficam guardados para um filme continuar a aparecer depois de sair da grelha.
+- **Regras:** "por classificar" = filmes explícitos sem tier + vistos que a grelha conhece e nunca foram postos num tier (um visto sem metadados, que já saiu da grelha, não aparece). Adicionar um filme à tierlist marca-o como visto. O ✕ de um cartão devolve-o a "por classificar" (não o apaga; para o tirar de vez, desmarcar o visto). Apagar um tier devolve os filmes a "por classificar". Tiers: renomear (máx. 24 caracteres), cor (8 da paleta, sem vermelho nem ouro), adicionar, apagar, reordenar (modo "Editar tiers").
+- **Pesquisa de filmes para adicionar:** ao vivo no TMDB (`/search/movie` em pt-PT e `/movie/<id>/external_ids` para obter o ID do IMDb). A chave v3 é **colada pelo utilizador no browser** e guarda-se em `filmes-tv:tmdb-chave` (uma vez por dispositivo): nunca no código nem no repo. Chave recusada (401) é apagada e pedida de novo; sem rede, mensagem; filme sem ID do IMDb não se adiciona.
+- **Arrasto:** SortableJS 1.15.6 (MIT) copiado para `vendor/Sortable.min.js` e embutido no HTML (sem CDN). `forceFallback` (eventos de ponteiro, igual para rato e dedo) com press longo (220 ms) no toque, para não colidir com o scroll.
+- **Código:** `tierlist_estado.js` (estado puro, sem DOM; testado com `node --test` em `tests/js/` através de `tests/test_tierlist_js.py`, que se salta se não houver `node`), `tierlist.js` (vista), ponte `window.FilmesTV` em `pagina.js` (vistos, `marcarVisto`, `aoMudarMarcas`, `metaFilme`). O servidor (`views_html`, `tierlist_html` em `filmes_tv.py`) só gera o esqueleto; `window.FilmesTV.tierlist` é também o gancho das verificações.
+- **Verificação:** `tools/verificar_tierlist.py` (Chromium headless, página real; inclui arrasto com eventos de ponteiro sintéticos, edição de tiers, pesquisa TMDB com `fetch` simulado, exportar/importar, `localStorage` bloqueado; demora ~2 minutos) e `tools/capturar.py --vista tierlist --tierlist-demo [--editar]`.
+- **Não verificado:** o arrasto **com o dedo** (press longo, `pointerType=touch`) e o aspeto/tamanho dos toques num telemóvel real; as verificações só simulam rato. A reordenação das linhas de tiers por arrasto só se verificou pelo gancho (`soltarTier`), não com o rato.
+- **Fora de âmbito:** partilhar como imagem, várias tierlists, sincronização automática entre dispositivos, anular, notas por filme, ordenar por rating dentro do tier, "apagar de vez" explícito.
+
 ## Verificação no browser (`tools/`)
 
-Precisam do Chromium do Playwright (`~/.cache/ms-playwright`) e do `filmes.db` local; não fazem parte do `unittest`. Cada script compara o JS da página com um oráculo em Python e termina com código 1 se falhar: `tools/verificar_horas.py` (recálculo de secções, prazos e fitas em 7 horas simuladas), `tools/verificar_pesquisa.py` (título, ator, "Sem correspondência", escrever e limpar), `tools/verificar_marcas.py` (visto, guardar, filtros, persistência, nota, localStorage bloqueado, separadores). `tools/capturar.py` tira capturas da página (telemóvel por omissão; `--q`, `--css`, `--marcar`, `--vistos`, `--ocultar`, `--guardados-modo`). `tools/_nav.py` é a base comum. **Antes isto vivia no scratchpad e perdeu-se; manter aqui.**
+Precisam do Chromium do Playwright (`~/.cache/ms-playwright`) e do `filmes.db` local; não fazem parte do `unittest`. Cada script compara o JS da página com um oráculo em Python e termina com código 1 se falhar: `tools/verificar_horas.py` (recálculo de secções, prazos e fitas em 7 horas simuladas), `tools/verificar_pesquisa.py` (título, ator, "Sem correspondência", escrever e limpar), `tools/verificar_marcas.py` (visto, guardar, filtros, persistência, nota, localStorage bloqueado, separadores). `tools/capturar.py` tira capturas da página (telemóvel por omissão; `--q`, `--css`, `--marcar`, `--vistos`, `--ocultar`, `--guardados-modo`). `tools/verificar_tierlist.py` (tierlist: ver a secção "Tierlist"). `tools/_nav.py` é a base comum (`correr` injeta um cenário na página e devolve o resultado). **Antes isto vivia no scratchpad e perdeu-se; manter aqui.**
 
 ## Posters
 
@@ -95,6 +108,8 @@ Cada filme mostra o poster à direita (no telemóvel as emissões ocupam a largu
 - `filmes_tv.py`: todo o código.
 - `tmdb.svg`: logótipo oficial do TMDB (da página de atribuição deles), embutido no rodapé.
 - `estilo.css` e `pagina.js`: o estilo e o script da página; são embutidos em `filmes.html` pelo `report` (a página continua num só ficheiro).
+- `tierlist_estado.js`, `tierlist.js` e `vendor/Sortable.min.js` (com `vendor/Sortable.LICENSE`): a vista Tierlist (ver a secção "Tierlist"); também embutidos.
+- `docs/superpowers/`: desenho e plano da tierlist.
 - `tests/`: testes (`python -m unittest discover -s tests`).
 - `dev.py`: servidor local com recarregamento automático, só para desenvolvimento.
 - `tools/`: verificações no browser e captura de ecrã (ver "Verificação no browser").
@@ -176,11 +191,12 @@ O Cinemundo foi retirado de propósito. Não voltar a acrescentar.
 11. ~~Pesquisa por nome e por ator~~ — feita (ver "Pesquisa"). Por fazer: pesquisa por canal.
 12. Podar `matches` sem nenhuma emissão há muito tempo (proposta: 90 dias; se o filme voltar, volta a ser identificado). Adiada por decisão do utilizador. Agora pesa mais: o elenco acrescenta ~650 bytes por linha de `data/matches.csv`, que nunca é podada.
 13. ~~Marcas de visto e guardado, filtro Guardados e Ocultar vistos~~ — feitas (ver "Marcas"). Por fazer, se fizer falta: exportar/importar as marcas (limpar o browser apaga-as), anular ao marcar visto com "ocultar" ligado.
-14. Opcional: filtro de votos mínimos (para evitar notas altas com poucos votos), filtros por canal/rating na página.
+14. ~~Tierlist pessoal~~ — feita (ver "Tierlist"). Por validar: arrasto com o dedo e aspeto num telemóvel real.
+15. Opcional: filtro de votos mínimos (para evitar notas altas com poucos votos), filtros por canal/rating na página.
 
 ## Retomar numa sessão nova
 
-Estado em 2026-10-13: tudo está commitado e enviado para o GitHub; a página online está atualizada. `python -m unittest discover -s tests` (139 testes) passa. As verificações no browser estão em `tools/` (precisam do Chromium do Playwright e do `filmes.db`; se faltar, `python filmes_tv.py --relatorio`). **Coisas que nunca devem viver só no scratchpad ou na conversa:** scripts de verificação e decisões; tudo o que importa deve estar neste ficheiro ou no repo.
+Estado em 2026-10-13: tudo está commitado e enviado para o GitHub; a página online está atualizada. `python -m unittest discover -s tests` (147 testes, incluindo os de `node --test` da tierlist) passa. As verificações no browser estão em `tools/` (precisam do Chromium do Playwright e do `filmes.db`; se faltar, `python filmes_tv.py --relatorio`). **Coisas que nunca devem viver só no scratchpad ou na conversa:** scripts de verificação e decisões; tudo o que importa deve estar neste ficheiro ou no repo.
 
 Forma de trabalhar combinada: antes de uma funcionalidade nova, perguntas **uma de cada vez** com opções e recomendação, depois um desenho curto e só se implementa com aprovação; testes primeiro; para mudanças de aspeto, ver capturas (`tools/capturar.py`); nunca fazer `git push` sem o utilizador pedir (regra global); fazer `git pull` antes de mexer, porque o bot atualiza `data/` todos os dias.
 

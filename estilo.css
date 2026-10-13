@@ -479,7 +479,7 @@ footer a { color: inherit; }
 .jump[data-vista="tier"] .links, .jump[data-vista="tier"] .find { display: none; }
 .jump[data-vista="tier"] .views { padding-bottom: 0.6rem; }
 
-.tl-titulo { margin: 1.6rem 0 0.8rem; }
+.tl-titulo { margin: 1.6rem 0 0.8rem; font-size: 1.5rem; font-weight: 800; font-stretch: 80%; }
 .tl-sub { margin: 1.8rem 0 0.6rem; font-size: 1rem; color: var(--dim); }
 .tl-barra { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1rem; }
 
@@ -537,7 +537,7 @@ footer a { color: inherit; }
 }
 
 .tl-card img { display: block; width: 100%; height: 100%; object-fit: cover; }
-.tl-sem { display: block; padding: 0.3rem; font-size: 0.7rem; line-height: 1.15; overflow-wrap: anywhere; }
+.tl-sem { display: block; padding: 0.3rem 1.3rem 0.3rem 0.3rem; font-size: 0.7rem; line-height: 1.15; overflow-wrap: anywhere; }
 
 .tl-x {
   position: absolute;
