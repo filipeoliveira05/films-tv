@@ -95,12 +95,52 @@
     return row;
   };
 
+  let sortables = [];
+
+  // um só caminho para rato e dedo: forceFallback usa eventos de ponteiro e não o drag and drop nativo (que não
+  // funciona com toque); com o dedo é preciso um press longo (delay), para não colidir com o scroll
+  const ARRASTO = {
+    group: "tl",
+    animation: 150,
+    forceFallback: true,
+    fallbackOnBody: true,
+    delay: 220,
+    delayOnTouchOnly: true,
+    touchStartThreshold: 6,
+    draggable: ".tl-card",
+    filter: ".tl-x",
+    preventOnFilter: false,
+    ghostClass: "tl-fantasma",
+    fallbackClass: "tl-arrastado",
+  };
+
+  const ativarArrasto = () => {
+    sortables.forEach((s) => s.destroy());
+    sortables = [];
+    root.querySelectorAll(".tl-lista").forEach((lista) => {
+      const livres = lista.id === "tl-livres";
+      sortables.push(
+        Sortable.create(lista, {
+          ...ARRASTO,
+          sort: !livres, // "por classificar" não tem ordem própria
+          onEnd: (evt) => {
+            if (livres && evt.from === evt.to) return;
+            const id = evt.item.dataset.film;
+            const tier = evt.to.dataset.tier || null;
+            setTimeout(() => soltar(id, tier, evt.newIndex), 0); // deixa o Sortable acabar antes de repintar
+          },
+        })
+      );
+    });
+  };
+
   function pintar() {
     $("#tl-tiers").replaceChildren(...estado.tiers.map(linha));
     const livres = $("#tl-livres");
     livres.replaceChildren(...T.naoClassificados(estado, FT.vistos()).map((id) => cartao(id, false)));
     $("#tl-vazio").hidden = livres.children.length > 0;
     avisar();
+    ativarArrasto();
   }
 
   // guarda na tierlist os metadados dos vistos que a grelha conhece (para sobreviverem quando saírem da grelha)

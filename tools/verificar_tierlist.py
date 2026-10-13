@@ -118,4 +118,33 @@ r = cena("S7  evento storage", query="?v=tierlist", cenario=f"""
 if r:
     R.ok("repinta com o estado da outra aba", [t["nome"] for t in r["r"]["tiers"]] == ["Top"], str(r["r"]["tiers"]))
 
+# ---- S8: arrasto a sério (eventos de ponteiro sintéticos sobre o SortableJS)
+ARRASTAR = """
+const arrastar = async (card, destino, dx = 20, dy = 20) => {
+  const r = card.getBoundingClientRect(), d = destino.getBoundingClientRect();
+  const ev = (tipo, x, y, alvo) => alvo.dispatchEvent(new PointerEvent(tipo, { bubbles: true, cancelable: true, clientX: x, clientY: y,
+    button: 0, buttons: tipo === 'pointerup' ? 0 : 1, pointerId: 1, pointerType: 'mouse', isPrimary: true }));
+  const x0 = r.x + r.width / 2, y0 = r.y + r.height / 2, x1 = d.x + dx, y1 = d.y + dy;
+  ev('pointerdown', x0, y0, card);
+  for (let i = 1; i <= 6; i++) { ev('pointermove', x0 + (x1 - x0) * i / 6, y0 + (y1 - y0) * i / 6, document); await wait(40); }
+  await wait(300); ev('pointermove', x1, y1, document); await wait(300);   // deixa as animações do Sortable acabarem
+  ev('pointerup', x1, y1, document);
+  await wait(400);
+};
+"""
+r = cena("S8  arrasto com o SortableJS", query="?v=tierlist", cenario=ARRASTAR + f"""
+  window.FilmesTV.marcarVisto('{A}', '{B}'); await wait(100);
+  await arrastar($('#tl-livres .tl-card[data-film="{A}"]'), $('#tl-tiers .tl-lista[data-tier="t1"]'));
+  const aposA = snap();
+  await arrastar($('#tl-livres .tl-card[data-film="{B}"]'), $('#tl-tiers .tl-lista[data-tier="t3"]'));
+  const aposB = snap();
+  await arrastar($('#tl-tiers .tl-card[data-film="{A}"]'), $('#tl-livres'));
+  return {{ aposA, aposB, fim: snap() }};""")
+if r:
+    x = r["r"]
+    R.ok("arrastar de por classificar para o tier S", x["aposA"]["tiers"][0]["filmes"] == [A], str(x["aposA"]["tiers"][0]))
+    R.ok("arrastar para outro tier (B)", x["aposB"]["tiers"][2]["filmes"] == [B], str(x["aposB"]["tiers"][2]))
+    R.ok("arrastar de volta para por classificar", x["fim"]["livres"] == [A] and x["fim"]["tiers"][0]["filmes"] == [], str(x["fim"]))
+    R.ok("o arrasto ficou guardado", json.loads(x["fim"]["store"])["itens"][B]["tier"] == "t3")
+
 R.fim()

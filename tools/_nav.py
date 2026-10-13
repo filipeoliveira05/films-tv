@@ -54,7 +54,7 @@ def dump(url, orcamento=5000):
     return r.stdout
 
 
-def correr(html, cenario, pre="", query="", fase2="", nome="cenario.html", orcamento=20000):
+def correr(html, cenario, pre="", query="", fase2="", nome="cenario.html", orcamento=20000, janela="800,2600"):
     """Injeta `cenario` (corpo de uma função async) na página, corre-a no Chromium e devolve o que devolveu.
 
     `pre` corre antes de tudo (p. ex. localStorage ou fetch simulado). Com `fase2`, a página recarrega depois
@@ -84,7 +84,8 @@ const click = async (el) => {{ el.click(); await wait(200); }};
     html = html.replace("<meta charset='utf-8'>", "<meta charset='utf-8'><script>" + pre + "</script>", 1) + corpo
     caminho = TMP / nome
     caminho.write_text(html, encoding="utf-8")
-    dom = subprocess.run([BROWSER, "--no-sandbox", "--disable-gpu", f"--virtual-time-budget={orcamento}", "--dump-dom",
+    # janela alta: o elementFromPoint (usado no arrasto) só encontra o que está dentro do ecrã
+    dom = subprocess.run([BROWSER, "--no-sandbox", "--disable-gpu", f"--window-size={janela}", f"--virtual-time-budget={orcamento}", "--dump-dom",
                           f"file://{caminho}{query}"], capture_output=True, text=True, timeout=240).stdout
     res = BeautifulSoup(dom, "html.parser").body.get("data-res")
     return _json.loads(res) if res else {"ok": False, "erro": "sem resultado (a página não correu o cenário)"}

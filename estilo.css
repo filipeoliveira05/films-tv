@@ -553,3 +553,6 @@ footer a { color: inherit; }
   border: 0;
   cursor: pointer;
 }
+
+.tl-fantasma { opacity: 0.35; }
+.tl-arrastado { z-index: 20; opacity: 0.9; box-shadow: 0 6px 18px rgba(0, 0, 0, 0.5); }
