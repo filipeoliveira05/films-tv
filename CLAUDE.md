@@ -34,17 +34,26 @@ Limitação a ter presente: a página mostra o que passou na grelha, não o que 
 **Validado em 2026-10-05 (execução local):** scraping dos 16 canais (~2300 programas, 3 a 10 de outubro, 0 avisos de "0 programas"), parser com testes (`python -m unittest discover -s tests`), datas ("Hoje" do site = data local, confirmado com a página "No AR"). robots.txt só proíbe `/ajax/` e `/cgi-bin/`.
 **Matching TMDB (2026-10-05, 725 títulos):** 582 com correspondência, 143 sem. A 1.ª versão (só duração) dava 624 mas com erros graves (ex.: "Inferno" -> *Insidious Inferno*, "Bird" -> *Lady Bird*); a regra atual troca cobertura por precisão. O topo da lista foi revisto à mão e está correto. Ambiguidades por remakes com o mesmo título (Annie, Shaft, Passageiros) dependem só da duração e podem falhar. Os `(VP)` e a versão original aparecem como entradas separadas. Filmes de TV/Natal com título local ficam sem correspondência.
 **Também validado:** download do dataset IMDb (1,7 M ratings em ~5 s) e geração do `filmes.html`.
-**Validado no GitHub (2026-10-05, execução manual):** os servidores do GitHub conseguem ler o tudonumclick.com (16 canais, mesmos totais que localmente), testes e deploy para o Pages passaram, a página está online. **Cron e bot (verificado em 2026-10-12 com `gh run list`):** o cron (`schedule`) corre todos os dias e o bot faz commit de `data/`, mas o GitHub atrasa-o muito: as execuções agendadas começam por volta das 11:30 UTC e não às 05:00 (o utilizador tem disparado o workflow à mão de manhã). Uma falhou (11/10): *timeout* de ligação na primeira chamada ao site (`discover_slugs`), sem retentativa; corrigido com `RETRY_WAITS` em `get()` e recurso a `KNOWN_SLUGS`. Por validar: o aspeto no telemóvel.
+**Validado no GitHub (2026-10-05, execução manual):** os servidores do GitHub conseguem ler o tudonumclick.com (16 canais, mesmos totais que localmente), testes e deploy para o Pages passaram, a página está online. **Cron e bot (verificado em 2026-10-12 com `gh run list`):** o cron (`schedule`) corre todos os dias e o bot faz commit de `data/`, mas o GitHub atrasa-o muito: as execuções agendadas começam por volta das 11:30 UTC e não às 05:00 (o utilizador tem disparado o workflow à mão de manhã). Uma falhou (11/10): *timeout* de ligação na primeira chamada ao site (`discover_slugs`), sem retentativa; corrigido com `RETRY_WAITS` em `get()` e recurso a `KNOWN_SLUGS`. **Primeira execução completa com poster, elenco e marcas (2026-10-13, disparo manual):** passou; 90 filmes novos identificados e 0 por preencher em poster e elenco (os novos trazem ambos do matching); o bot fez commit. Por validar: se o cron das 05:17 UTC chega a horas (às 07:00 UTC de 13/10 ainda não tinha corrido) e o aspeto/toque no telemóvel.
 
 Achados do HTML real: cada programa é um `div.channel_data` com a hora em `<b>HH:MM às HH:MM</b>` e o título em `<b class="ml10 dib">`; a página de cada dia **abre com o programa da noite anterior que atravessa a meia-noite** (o parser data-o no dia anterior). O NOS Studios tem emissões sobrepostas no próprio site (15 sobreposições). Alguns títulos trazem o ano, ex. "Pinóquio (2019)", e séries ("T12 - Ep. 3") passam o filtro de duração.
 
 **Termos do site** (`/termos-e-condicoes/`, 2020): a secção "Cópia de conteúdos" proíbe reproduzir/distribuir a informação sem autorização. Uso pessoal a baixo ritmo parece compatível, mas publicar a grelha no GitHub Pages / `airings` num repo público é uma zona cinzenta. Decisão do utilizador (2026-10-05): seguir com repo e página públicos (opção A), assumindo esse risco.
 
+## GitHub Actions (`.github/workflows/atualizar.yml`)
+
+- **Gatilhos:** `schedule` (cron `17 5 * * *`, UTC), `workflow_dispatch` (com opção "só página") e `push` em `main` só se mudar `estilo.css`, `pagina.js`, `filmes_tv.py` ou o próprio workflow. Os pushes do bot (só `data/`) e os de documentação não o disparam.
+- **Modo completo** (cron e disparo manual): corre os testes, `python filmes_tv.py` (scraping, matching, posters, elenco, ratings, página), faz commit de `data/` com `git pull --rebase` antes do push (aguenta pushes teus a meio) e publica no Pages. Se nenhum canal for lido, falha de propósito e não publica.
+- **Modo "só página"** (push, ou disparo manual com a opção): `python filmes_tv.py --relatorio` cria a base de dados do zero, importa `data/*.csv`, descarrega os ratings e gera a página. **Sem pedidos ao tudonumclick.com nem ao TMDB**, não precisa da chave e não faz commit. O `checkout` usa a ponta do ramo, para apanhar os dados mais recentes do bot.
+- `concurrency: filmes` (uma execução de cada vez). `data/atualizado.txt` é reescrito em cada execução completa, por isso o bot faz commit todos os dias.
+- **O cron do GitHub atrasa muito** (horas; já falhou uma vez por timeout do site, entretanto tratado com retentativas). Dispara-se à mão (`gh workflow run atualizar.yml`) quando se quer a página fresca de manhã.
+- Versões das actions: `checkout@v4`, `setup-python@v5`, `upload-pages-artifact@v3`, `deploy-pages@v4`. O GitHub avisa que `checkout` e `setup-python` correm em Node 20 (descontinuado); rever.
+
 ## Design da página
 
 Conceito: o menu no ecrã (OSD) de um gravador: fundo azul de "sem sinal", texto branco, ponto vermelho de REC, verde de PLAY. Cada cor tem um só significado (vermelho = gravar/urgente, verde = a dar agora, ouro = rating >= 8). Tipo: Archivo variável (Google Fonts, eixo de largura: condensado nos títulos, expandido nos ratings). Elemento central: a "fita", barra por emissão que mostra a fração da janela de 7 dias que ainda resta (vermelha se faltar menos de 1 dia). Funciona sem JavaScript (o script só acrescenta o recálculo ao longo do dia, a pesquisa e as marcas). Pensado primeiro para telemóvel; "Sem correspondência" vem recolhida. Para ver alterações, gerar a página e fotografá-la com o Chromium headless do Playwright (`~/.cache/ms-playwright`).
 
-**Página viva:** o HTML é gerado uma vez por dia (06:00), mas `pagina.js` (embutido) recalcula no browser, ao abrir e de minuto a minuto, em que secção está cada emissão ("A dar agora", "Para gravar", "A vir"), os "faltam/em", a fita, o estado urgente e as contagens, a partir de `data-start`/`data-end` (segundos UTC; `epoch()` converte a hora de Lisboa). Sem JavaScript a página continua certa à hora da geração. Para testar outra hora: `?t=<milissegundos>` no endereço. Verificado a comparar o JS com o gerador Python (oráculo) em 7 horas simuladas. O aviso de histórico incompleto e a hora "Atualizado" são estáticos (da geração).
+**Página viva:** o HTML é gerado em cada execução completa do workflow (em princípio uma por dia), mas `pagina.js` (embutido) recalcula no browser, ao abrir e de minuto a minuto, em que secção está cada emissão ("A dar agora", "Para gravar", "A vir"), os "faltam/em", a fita, o estado urgente e as contagens, a partir de `data-start`/`data-end` (segundos UTC; `epoch()` converte a hora de Lisboa). Sem JavaScript a página continua certa à hora da geração. Para testar outra hora: `?t=<milissegundos>` no endereço. Verificado a comparar o JS com o gerador Python (oráculo) em 7 horas simuladas. O aviso de histórico incompleto é estático (da geração). A hora "Atualizado" é a da **última recolha de dados** (`data/atualizado.txt`), e não a da geração da página.
 
 ## Pesquisa
 
@@ -56,7 +65,7 @@ Verificação: `tools/verificar_pesquisa.py` (oráculo em Python que calcula, a 
 
 ## Marcas: visto e guardado
 
-Cada filme tem dois botões na coluna do rating: **olho** (já vi) e **marcador** (guardar para gravar). As marcas são **por filme** (ID do IMDb), por isso valem em todas as secções onde o filme aparece, e guardam-se **só neste browser** (`localStorage`, chave `filmes-tv:marcas`, `{v:1, guardados, vistos, ocultarVistos}`): telemóvel e computador não partilham, e limpar os dados do browser apaga-as. Sem armazenamento (modo privado) valem só enquanto a página está aberta. Há sincronização entre separadores abertos (evento `storage`).
+Cada filme tem dois botões na coluna do rating: **olho** (já vi) e **marcador** (guardar para gravar). As marcas são **por filme** (ID do IMDb), por isso valem em todas as secções onde o filme aparece, e guardam-se **só neste browser** (`localStorage`, chave `filmes-tv:marcas`, `{v:1, guardados, vistos, ocultarVistos}`): telemóvel e computador não partilham, e limpar os dados do browser apaga-as. Sem armazenamento (modo privado) valem só enquanto a página está aberta. Há sincronização entre separadores abertos (evento `storage`). O `localStorage` é partilhado por tudo o que viva em `filipeoliveira05.github.io`, por isso a chave tem prefixo (`filmes-tv:`).
 - **Visto:** a linha fica a ~55% de opacidade e o poster a preto e branco; os botões ficam nítidos. O filme continua na lista.
 - **Guardados:** botão com marcador e contagem ao lado do campo de pesquisa. Premido, a página mostra só os guardados, nas mesmas três secções (com prazo e fita) e combinável com a pesquisa; "Sem correspondência" esconde-se (não tem ID, não se pode guardar). A contagem e o filtro só consideram filmes com alguma emissão na página; se houver guardados sem emissão, aparece a nota "N guardados já não estão disponíveis (reaparecem se voltarem a passar)". O modo não se guarda entre visitas.
 - **Ocultar vistos:** botão com olho riscado e a contagem de vistos. Esconde os vistos das listas; **a preferência guarda-se**. Marcar como visto com isto ligado faz o filme desaparecer logo (não há anular; desliga o filtro para o ver).
@@ -77,7 +86,7 @@ Cada filme mostra o poster à direita (no telemóvel as emissões ocupam a largu
 
 1. **Scraping** (`discover_slugs`, `scrape_channel`, `parse_programs`): para cada canal pede `/programacao-tv/<slug>/` e depois cada dia listado na navegação da página (`/<slug>/<dia>/`). O parser não usa seletores CSS: lê o texto da página e procura linhas `HH:MM às HH:MM` seguidas do título. Guarda em `airings(channel, start, end, title)` com `INSERT OR IGNORE`, por isso correr várias vezes acumula histórico.
 2. **Filtro de filmes**: considera filme qualquer programa com duração >= `MIN_MINUTES` (75). É uma heurística; não há categoria no site.
-3. **Matching TMDB** (`match_title`, `choose`): pesquisa `/search/movie` em `pt-PT` (com `year` se o título trouxer "(2019)"; `(VP)` e `´` são normalizados; episódios "T12 - Ep. 3" são ignorados). Só vê detalhes de resultados cujo título (pt-PT ou original) seja parecido (`similarity` >= 0.85, ignorando acentos/maiúsculas; o prefixo antes de " - " ou ": " vale um pouco menos). Duração do slot vs. filme com tolerância assimétrica (slot pode ser até 60 min mais longo por publicidade, ou 25 mais curto); desempata por semelhança e depois por duração. Recurso: sem título parecido, aceita o 1.º resultado se tiver >= 1500 votos e duração a ±15 min (ex.: "Duna" vs "Dune: Parte Um"). Os falhanços ficam em `matches` com `imdb_id` NULL.
+3. **Matching TMDB** (`match_title`, `choose`): pesquisa `/search/movie` em `pt-PT` (com `year` se o título trouxer "(2019)"; `(VP)` e `´` são normalizados; episódios "T12 - Ep. 3" são ignorados). Só vê detalhes de resultados cujo título (pt-PT ou original) seja parecido (`similarity` >= 0.85, ignorando acentos/maiúsculas; o prefixo antes de " - " ou ": " vale um pouco menos). Duração do slot vs. filme com tolerância assimétrica (slot pode ser até 60 min mais longo por publicidade, ou 25 mais curto); desempata por semelhança e depois por duração. Recurso: sem título parecido, aceita o 1.º resultado se tiver >= 1500 votos e duração a ±15 min (ex.: "Duna" vs "Dune: Parte Um"). Os falhanços ficam em `matches` com `imdb_id` NULL e são repetidos ao fim de `RETRY_DAYS` (30). Devolve também o `poster_path` e o elenco (`append_to_response=external_ids,credits`).
 4. **Ratings**: descarrega `title.ratings.tsv.gz` de datasets.imdbws.com (refresca se tiver mais de 7 dias) para a tabela `ratings`; o join é local.
 5. **Relatório** (`collect_films`, `report`): gera `filmes.html` com um filme por `imdb_id` (junta `(VP)` e variantes de maiúsculas) e três secções, todas ordenadas por rating (sem rating no fim): "A dar agora" (só se houver), "Para gravar" (emissões já terminadas nos últimos 7 dias, com "até <data> (faltam X)", a vermelho se faltar menos de 1 dia; prazo = início + 7 dias, **suposição não verificada** sobre como a NOS conta) e "A vir" (início no futuro). Um filme pode estar em "Para gravar" e "A vir", cada um só com as suas emissões. Termina com "Sem correspondência".
 
@@ -89,7 +98,8 @@ Cada filme mostra o poster à direita (no telemóvel as emissões ocupam a largu
 - `tests/`: testes (`python -m unittest discover -s tests`).
 - `dev.py`: servidor local com recarregamento automático, só para desenvolvimento.
 - `tools/`: verificações no browser e captura de ecrã (ver "Verificação no browser").
-- `data/`: `airings.csv` e `matches.csv`, o estado guardado no repo.
+- `data/`: `airings.csv`, `matches.csv` e `atualizado.txt` (hora da última recolha), o estado guardado no repo.
+- `.github/workflows/atualizar.yml`: o workflow (ver "GitHub Actions"). `requirements.txt`: `requests` e `beautifulsoup4`. `.env.example`: modelo do `.env` local (com a `TMDB_API_KEY`; o `.env` está no `.gitignore`).
 - `filmes.db`: SQLite (tabelas `airings`, `matches`, `ratings`). Gerado.
 - `title.ratings.tsv.gz`: cache do dataset IMDb. Gerado.
 - `filmes.html`: resultado. Gerado.
@@ -108,7 +118,7 @@ python filmes_tv.py
 
 ### Mexer no visual sem fazer push
 
-`python dev.py` abre um servidor em http://localhost:8000: regenera a página a cada pedido e recarrega o browser sozinho quando gravas `estilo.css`, `pagina.js` ou `filmes_tv.py` (o aviso de recarregar só existe nesse servidor; se o código tiver um erro, o erro aparece no browser). Usa o `filmes.db` local e junta `data/*.csv`, sem pedidos de rede. Alternativa manual: `python filmes_tv.py --relatorio` e abrir `filmes.html`. Vista de telemóvel: F12 e Ctrl+Shift+M. Outra hora: `?t=<milissegundos>`. Nada vai para o site online enquanto não houver push **e** uma execução do workflow (a página é gerada lá).
+`python dev.py` abre um servidor em http://localhost:8000: regenera a página a cada pedido e recarrega o browser sozinho quando gravas `estilo.css`, `pagina.js` ou `filmes_tv.py` (o aviso de recarregar só existe nesse servidor; se o código tiver um erro, o erro aparece no browser). Usa o `filmes.db` local e junta `data/*.csv`, sem pedidos de rede. Alternativa manual: `python filmes_tv.py --relatorio` e abrir `filmes.html`. Vista de telemóvel: F12 e Ctrl+Shift+M. Outra hora: `?t=<milissegundos>`. Para ir para o site online basta fazer push: se mexeres em `estilo.css`, `pagina.js`, `filmes_tv.py` ou no workflow, o push dispara sozinho o workflow em modo "só página" (cerca de 1 minuto, sem pedidos ao site; ver "GitHub Actions").
 
 ## Canais (todos confirmados pelo utilizador)
 
@@ -142,11 +152,14 @@ O Cinemundo foi retirado de propósito. Não voltar a acrescentar.
 
 ## Riscos conhecidos / a verificar
 
-- **Parser**: se a hora e o "às" estiverem em elementos separados, a regex linha a linha falha. O script avisa com "0 programas lidos" por canal. Ajustar `parse_programs` com base no HTML real.
-- **Datas**: os offsets dos dias usam `date.today()` local. Na página lida, "Amanhã" apontava para domingo quando a data real já era domingo, o que sugere que o conteúdo lido estava em cache ou desfasado. Confirmar que "Hoje" no site coincide com a data local.
-- **Matching**: títulos portugueses com grafias estranhas (ex.: "D´Artacão E Os Três Moscãoteiros") ou muito curtos ("Cantar!") podem falhar ou apanhar o filme errado. Os falhanços nunca são repetidos (ficam em `matches` com NULL).
-- **Séries longas** podem passar o filtro de duração mas não vão ter correspondência em `/search/movie`; ficam na lista de "sem correspondência".
-- **Termos de uso**: não foram verificados os termos nem o `robots.txt` do tudonumclick.com. Verificar antes de automatizar. Manter o ritmo baixo (`REQUEST_DELAY` = 1 s; cerca de 100 pedidos por execução).
+- **Origem dos horários:** o parser depende da estrutura HTML do tudonumclick.com (um `div.channel_data` por programa). Se mudar, o script avisa com "0 programas lidos" por canal e, se nenhum canal for lido, falha de propósito. Termos do site: zona cinzenta assumida (opção A).
+- **Cron do GitHub** atrasado ou falhado (ver "GitHub Actions"); a "Para gravar" só fica completa com execuções diárias (um dia falhado é recuperado pelo "ontem" do site, dois seguidos perdem um dia).
+- **Matching:** remakes com o mesmo título dependem só da duração; filmes de TV/Natal com título local ficam sem correspondência; um match errado mostra também o poster e o elenco errados.
+- **Dependências externas da página:** Google Fonts (sem rede cai para a fonte do sistema) e `image.tmdb.org` (posters); os termos do TMDB exigem a atribuição que está no rodapé.
+- **Marcas só no browser:** limpar os dados do browser apaga-as; telemóvel e computador não partilham.
+- **Tamanho:** o HTML tem ~2,5 MB crus e ~580 KB comprimidos; cresce com a janela de dados e o elenco. `data/matches.csv` nunca é podada (ver "Por fazer", ponto 12).
+- **Prazo de "Para gravar"** (início + 7 dias): suposição não verificada sobre como a NOS conta.
+- **Telemóvel real:** aspeto, tamanho dos toques (40 px) e desempenho nunca foram vistos num telemóvel; só em capturas do Chromium.
 
 ## Por fazer
 
@@ -154,7 +167,7 @@ O Cinemundo foi retirado de propósito. Não voltar a acrescentar.
 2. ~~Fixtures e testes do parser~~ — feito (`tests/`; fixtures são excertos reduzidos, por causa dos termos do site).
 3. ~~Datas~~ — feito ("Hoje" do site = data local, confirmado com a página "No AR").
 4. ~~robots.txt e termos~~ — feito (ver "Termos do site" acima; publicação pública assumida pelo utilizador).
-5. ~~Matching~~ — avaliado e reescrito (ver "Matching TMDB" acima). Continuam por melhorar os 143 sem correspondência e os remakes ambíguos.
+5. ~~Matching~~ — avaliado e reescrito (ver "Matching TMDB" acima). Continuam por melhorar os sem correspondência (143 em 5/10, 235 em 13/10, a janela cresceu) e os remakes ambíguos.
 6. ~~Repetir falhanços de matching~~ — feito (`RETRY_DAYS` = 30, coluna `matches.checked`).
 7. ~~Dividir o relatório em duas secções~~ — feito (ver "Relatório" acima).
 8. ~~Podar `airings` com mais de ~8 dias~~ — feito (`prune`, `KEEP_DAYS` = 8, chamada em `main()` depois do scraping; os `matches` não são podados).
@@ -164,6 +177,14 @@ O Cinemundo foi retirado de propósito. Não voltar a acrescentar.
 12. Podar `matches` sem nenhuma emissão há muito tempo (proposta: 90 dias; se o filme voltar, volta a ser identificado). Adiada por decisão do utilizador. Agora pesa mais: o elenco acrescenta ~650 bytes por linha de `data/matches.csv`, que nunca é podada.
 13. ~~Marcas de visto e guardado, filtro Guardados e Ocultar vistos~~ — feitas (ver "Marcas"). Por fazer, se fizer falta: exportar/importar as marcas (limpar o browser apaga-as), anular ao marcar visto com "ocultar" ligado.
 14. Opcional: filtro de votos mínimos (para evitar notas altas com poucos votos), filtros por canal/rating na página.
+
+## Retomar numa sessão nova
+
+Estado em 2026-10-13: tudo está commitado e enviado para o GitHub; a página online está atualizada. `python -m unittest discover -s tests` (139 testes) passa. As verificações no browser estão em `tools/` (precisam do Chromium do Playwright e do `filmes.db`; se faltar, `python filmes_tv.py --relatorio`). **Coisas que nunca devem viver só no scratchpad ou na conversa:** scripts de verificação e decisões; tudo o que importa deve estar neste ficheiro ou no repo.
+
+Forma de trabalhar combinada: antes de uma funcionalidade nova, perguntas **uma de cada vez** com opções e recomendação, depois um desenho curto e só se implementa com aprovação; testes primeiro; para mudanças de aspeto, ver capturas (`tools/capturar.py`); nunca fazer `git push` sem o utilizador pedir (regra global); fazer `git pull` antes de mexer, porque o bot atualiza `data/` todos os dias.
+
+Pendente, por ordem de interesse: (1) confirmar se o cron das 05:17 UTC chega a horas; (2) ver a página num telemóvel real; (3) pesquisa por canal (filtro por emissão, precisa de desenho); (4) poda de `matches` (adiada); (5) exportar/importar as marcas.
 
 ## Convenções
 
