@@ -309,6 +309,211 @@
     }
   };
 
+  // ---- duelos: todos os pares de um tier, um de cada vez; a ordem sugerida minimiza as contradições (ver tierlist_duelos.js)
+  const DU = TierDuelos;
+  const KEY_DUELOS = "filmes-tv:duelos";
+  const ecra = $("#tl-duelos-ecra");
+  const corpo = $("#tl-duelos-corpo");
+  let duelos = DU.normalizar(null);
+  let duelosGuardavel = true;
+  let dl = null; // duelo em curso: {tier, ids, fila:[[a,b]], total, feitos, historico:[{a,b,anterior}], rever}
+
+  const lerDuelos = () => {
+    let raw = null;
+    try {
+      raw = localStorage.getItem(KEY_DUELOS);
+    } catch (e) {
+      duelosGuardavel = false;
+    }
+    try {
+      if (raw) duelos = DU.normalizar(JSON.parse(raw));
+    } catch (e) {
+      /* valor corrompido: recomeça sem duelos */
+    }
+  };
+  const gravarDuelos = () => {
+    try {
+      localStorage.setItem(KEY_DUELOS, JSON.stringify(duelos));
+    } catch (e) {
+      duelosGuardavel = false;
+    }
+  };
+
+  const imagemDe = (m) => {
+    if (!m.poster) return el("span", "tl-sem", m.titulo);
+    const img = new Image();
+    img.src = m.poster;
+    img.alt = "";
+    img.draggable = false;
+    return img;
+  };
+  const nomeDe = (id) => {
+    const m = estado.filmes[id];
+    return m.titulo + (m.ano ? ` (${m.ano})` : "");
+  };
+  const mostrar = (...nos) => {
+    corpo.replaceChildren(...nos);
+    corpo.scrollTop = 0;
+  };
+
+  const mostrarMenu = () => {
+    dl = null;
+    $("#tl-duelos-titulo").textContent = "Duelos";
+    const nos = [el("p", "tl-dl-intro", "Escolhe um tier: duelas os filmes dele dois a dois e no fim vês a ordem que contradiz menos respostas.")];
+    if (!duelosGuardavel) nos.push(el("p", "tl-aviso", "Sem armazenamento neste browser: o progresso perde-se ao sair."));
+    estado.tiers.forEach((t) => {
+      const ids = T.listar(estado, t.id);
+      const { feitos, total } = DU.progresso(duelos.res, ids);
+      const b = botao("tl-dl-tier");
+      b.dataset.tier = t.id;
+      b.disabled = ids.length < 2;
+      const chip = el("span", "tl-dl-chip", t.nome);
+      chip.style.background = t.cor;
+      const estadoTxt = total === 0 ? "sem duelos" : feitos === total ? `${feitos}/${total} · ver ordem` : feitos ? `${feitos}/${total} · continuar` : `${feitos}/${total}`;
+      b.append(chip, el("span", "tl-dl-n", `${ids.length} filmes`), el("span", "tl-dl-prog", estadoTxt));
+      nos.push(b);
+    });
+    mostrar(...nos);
+  };
+
+  const mostrarDuelo = () => {
+    const [a, b] = dl.fila[0];
+    $("#tl-duelos-titulo").textContent = dl.rever ? "Rever conflitos" : "Duelos";
+    const barra = el("div", "tl-dl-barra");
+    barra.append(el("span", "", `Duelo ${dl.feitos + 1} de ${dl.total}`));
+    const trilho = el("span", "tl-dl-trilho");
+    const enche = el("i");
+    enche.style.width = `${(dl.feitos / dl.total) * 100}%`;
+    trilho.append(enche);
+    barra.append(trilho);
+    const par = el("div", "tl-dl-par");
+    (Math.random() < 0.5 ? [a, b] : [b, a]).forEach((id) => { // lado aleatório, para não viciar a escolha
+      const c = botao("tl-dl-card");
+      c.dataset.film = id;
+      c.append(imagemDe(estado.filmes[id]), el("span", "tl-dl-titulo", nomeDe(id)));
+      par.append(c);
+    });
+    const acoes = el("div", "tl-dl-acoes");
+    const empate = botao("tl-btn", "Empate / não sei");
+    empate.id = "tl-dl-empate";
+    const desfazer = botao("tl-btn", "Desfazer");
+    desfazer.id = "tl-dl-desfazer";
+    desfazer.disabled = dl.historico.length === 0;
+    acoes.append(empate, desfazer);
+    mostrar(barra, par, acoes);
+  };
+
+  const mostrarOrdem = () => {
+    const o = DU.ordenar(duelos.res, dl.ids);
+    $("#tl-duelos-titulo").textContent = "Ordem sugerida";
+    const nos = [];
+    const envolvidos = new Set(o.contradicoes.flatMap((c) => [c.vencedor, c.perdedor]));
+    if (o.contradicoes.length) {
+      const aviso = el("div", "tl-dl-aviso");
+      aviso.append(el("p", "", `${o.contradicoes.length} ${o.contradicoes.length === 1 ? "contradição" : "contradições"}: respostas em que o filme que ganhou ficou abaixo do que perdeu.`));
+      const ul = el("ul");
+      o.contradicoes.forEach((c) => ul.append(el("li", "", `${estado.filmes[c.vencedor].titulo} ganhou a ${estado.filmes[c.perdedor].titulo}`)));
+      aviso.append(ul);
+      nos.push(aviso);
+    }
+    const ol = el("ol", "tl-dl-ordem");
+    o.ordem.forEach((id) => {
+      const li = el("li", envolvidos.has(id) ? "tl-dl-conflito" : "");
+      li.dataset.film = id;
+      const mini = el("span", "tl-dl-mini");
+      mini.append(imagemDe(estado.filmes[id]));
+      li.append(mini, el("span", "tl-dl-titulo", nomeDe(id)), el("span", "tl-dl-pontos", `${o.vitorias[id] / 2} vit.`));
+      ol.append(li);
+    });
+    nos.push(ol);
+    const acoes = el("div", "tl-dl-acoes");
+    if (o.contradicoes.length) {
+      const rever = botao("tl-btn", `Rever conflitos (${o.contradicoes.length})`);
+      rever.id = "tl-dl-rever";
+      acoes.append(rever);
+    }
+    const aplicar = botao("tl-btn tl-btn-forte", "Aplicar ordem");
+    aplicar.id = "tl-dl-aplicar";
+    const voltar = botao("tl-btn", "Voltar");
+    voltar.id = "tl-dl-voltar";
+    acoes.append(aplicar, voltar);
+    nos.push(acoes);
+    mostrar(...nos);
+    dl.ordem = o.ordem;
+    dl.contradicoes = o.contradicoes;
+  };
+
+  const comecar = (tier) => {
+    const ids = T.listar(estado, tier);
+    const fila = DU.ordemDosPares(DU.pendentes(duelos.res, ids));
+    dl = { tier, ids, fila, total: fila.length, feitos: 0, historico: [], rever: false };
+    return fila.length ? mostrarDuelo() : mostrarOrdem();
+  };
+
+  const responderDuelo = (vencedor) => {
+    const [a, b] = dl.fila.shift();
+    dl.historico.push({ a, b, anterior: duelos.res[DU.chave(a, b)] });
+    duelos = { ...duelos, res: DU.registar(duelos.res, a, b, vencedor) };
+    gravarDuelos();
+    dl.feitos += 1;
+    return dl.fila.length ? mostrarDuelo() : mostrarOrdem();
+  };
+
+  const desfazerDuelo = () => {
+    const h = dl.historico.pop();
+    if (!h) return;
+    duelos = { ...duelos, res: h.anterior === undefined ? DU.remover(duelos.res, h.a, h.b) : DU.registar(duelos.res, h.a, h.b, h.anterior) };
+    gravarDuelos();
+    dl.fila.unshift([h.a, h.b]);
+    dl.feitos -= 1;
+    mostrarDuelo();
+  };
+
+  const reverConflitos = () => {
+    dl.fila = dl.contradicoes.map((c) => [c.vencedor, c.perdedor]);
+    dl.total = dl.fila.length;
+    dl.feitos = 0;
+    dl.historico = [];
+    dl.rever = true;
+    mostrarDuelo();
+  };
+
+  const abrirDuelos = () => {
+    lerDuelos();
+    ecra.hidden = false;
+    document.body.classList.add("tl-sem-scroll");
+    mostrarMenu();
+  };
+  const fecharDuelos = () => {
+    ecra.hidden = true;
+    dl = null;
+    document.body.classList.remove("tl-sem-scroll");
+  };
+
+  $("#tl-duelos").addEventListener("click", abrirDuelos);
+  $("#tl-duelos-sair").addEventListener("click", fecharDuelos);
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && !ecra.hidden) fecharDuelos();
+  });
+  corpo.addEventListener("click", (e) => {
+    const alvo = e.target.closest("button");
+    if (!alvo || !dl && !alvo.matches(".tl-dl-tier")) return;
+    if (alvo.matches(".tl-dl-tier")) return comecar(alvo.dataset.tier);
+    if (alvo.matches(".tl-dl-card")) return responderDuelo(alvo.dataset.film);
+    if (alvo.id === "tl-dl-empate") return responderDuelo("=");
+    if (alvo.id === "tl-dl-desfazer") return desfazerDuelo();
+    if (alvo.id === "tl-dl-rever") return reverConflitos();
+    if (alvo.id === "tl-dl-voltar") return mostrarMenu();
+    if (alvo.id === "tl-dl-aplicar") {
+      mudar(T.ordenarTier(estado, dl.tier, dl.ordem)); // só muda as posições dentro do tier
+      fecharDuelos();
+    }
+  });
+  // um duelo só mostra os dois posters: o menu do browser no press longo seria um estorvo
+  corpo.addEventListener("contextmenu", (e) => {
+    if (e.target.closest(".tl-dl-card")) e.preventDefault();
+  });
+
   // o press longo é o início do arrasto: sem isto o Chrome mostra o menu ("abrir imagem noutro separador", etc.) e cancela-o
   root.addEventListener("contextmenu", (e) => {
     if (e.target.closest(".tl-card")) e.preventDefault();

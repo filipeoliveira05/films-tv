@@ -33,6 +33,7 @@ ap.add_argument("--vista", choices=["tv", "tierlist"], default="tv", help="vista
 ap.add_argument("--tierlist-demo", action="store_true", help="enche a tierlist com os filmes de Para gravar, repartidos pelos tiers")
 ap.add_argument("--livres", type=int, default=0, help="com --tierlist-demo: N filmes por classificar")
 ap.add_argument("--selecionar", action="store_true", help="toca no primeiro cartão do primeiro tier (mostra o ✕)")
+ap.add_argument("--duelos", choices=["menu", "duelo", "ordem", "conflito"], help="abre o ecrã de duelos (com --tierlist-demo): menu, um duelo, a ordem sugerida, ou a ordem com contradições")
 ap.add_argument("--editar", action="store_true", help="abre a tierlist em modo de edição")
 a = ap.parse_args()
 
@@ -50,15 +51,26 @@ if a.tierlist_demo:
         y = li.select_one("h3 .y") if li else None
         return {"titulo": li.select_one("h3 a").get_text() if li else f"Filme {n}", "ano": y.get_text().strip("() ") if y else None,
                 "poster": img["src"] if img else None}
-    filmes = {i: meta(i, n) for n, i in enumerate(ids[:a.livres + 14])}
+    filmes = {i: meta(i, n) for n, i in enumerate(ids[:a.livres + 22])}
     tiers = [{"id": f"t{k}", "nome": nome, "cor": cor} for k, (nome, cor) in enumerate(
         zip(["10", "9", "8", "7", "6"], ["#b8e65a", "#8ff0cf", "#5ee0e0", "#6fa8ff", "#b48cff"]), 1)]
-    itens = {i: {"tier": f"t{1 + n % 5}", "pos": n // 5} for n, i in enumerate(ids[:14])}
-    for i in ids[14:14 + a.livres]:   # filmes por classificar (explícitos, sem tier)
+    itens = {i: {"tier": f"t{1 + n % 5}", "pos": n // 5} for n, i in enumerate(ids[:22])}
+    for i in ids[22:22 + a.livres]:   # filmes por classificar (explícitos, sem tier)
         itens[i] = {"tier": None, "pos": len(itens)}
     pre += f"try {{ localStorage.setItem('filmes-tv:tierlist', {json.dumps(json.dumps({'v': 1, 'tiers': tiers, 'itens': itens, 'filmes': filmes}))}); }} catch (e) {{}}"
 if a.selecionar:
     depois += "<script>setTimeout(() => document.querySelector('#tl-tiers .tl-card').click(), 300);</script>"
+if a.duelos:
+    passos = {"menu": 0, "duelo": 1, "ordem": 2, "conflito": 3}[a.duelos]
+    depois += """<script>setTimeout(async () => {
+      const w = (ms) => new Promise((r) => setTimeout(r, ms)), $ = (s) => document.querySelector(s), $$ = (s) => [...document.querySelectorAll(s)];
+      $('#tl-duelos').click(); await w(150);
+      if (%d >= 1) { $('#tl-duelos-corpo .tl-dl-tier[data-tier="t4"]').click(); await w(150); }
+      if (%d >= 2) { let i = 0; while ($$('#tl-duelos-corpo .tl-dl-card').length === 2 && i < 80) {
+        const [a, b] = $$('#tl-duelos-corpo .tl-dl-card').map((c) => c.dataset.film); const n = i++;
+        const ganha = (%d === 3 && n %% 4 === 3) ? (a < b ? b : a) : (a < b ? a : b);   // no modo conflito inverte alguns duelos
+        $('#tl-duelos-corpo .tl-dl-card[data-film="' + ganha + '"]').click(); await w(30); } }
+    }, 300);</script>""" % (passos, passos, passos)
 if a.editar:
     depois += "<script>setTimeout(() => document.getElementById('tl-editar').click(), 200);</script>"
 html = html.replace("<meta charset='utf-8'>", f"<meta charset='utf-8'><script>{pre}</script>", 1)
