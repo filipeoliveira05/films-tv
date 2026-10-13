@@ -147,4 +147,33 @@ if r:
     R.ok("arrastar de volta para por classificar", x["fim"]["livres"] == [A] and x["fim"]["tiers"][0]["filmes"] == [], str(x["fim"]))
     R.ok("o arrasto ficou guardado", json.loads(x["fim"]["store"])["itens"][B]["tier"] == "t3")
 
+# ---- S9: editar tiers
+r = cena("S9  editar tiers", query="?v=tierlist", cenario=f"""
+  window.FilmesTV.marcarVisto('{A}'); await wait(100);
+  T().soltar('{A}', 't2', 0); await wait(100);
+  await click($('#tl-editar'));
+  const emEdicao = snap();
+  const input = $('.tl-tier[data-tier="t1"] .tl-nome');
+  input.value = 'Obras-primas'; input.dispatchEvent(new Event('change', {{ bubbles: true }})); await wait(150);
+  const nome = snap();
+  await click($('.tl-tier[data-tier="t1"] .tl-cores button:nth-child(4)')); 
+  const cor = snap();
+  await click($('#tl-novo-tier')); const novo = snap();
+  T().soltarTier('t3', 0); await wait(100); const ordem = snap();
+  await click($('.tl-tier[data-tier="t2"] .tl-del')); const apagado = snap();
+  await click($('#tl-editar'));
+  return {{ emEdicao, nome, cor, novo, ordem, apagado, fim: snap() }};""",
+         fase2="return snap();")
+if r:
+    x, p = r["r"], r["fase1"]
+    R.ok("o modo de edição mostra campos de nome", all(t["nome"] for t in p["emEdicao"]["tiers"]) and len(p["emEdicao"]["tiers"]) == 5)
+    R.ok("renomear", p["nome"]["tiers"][0]["nome"] == "Obras-primas", str(p["nome"]["tiers"][0]))
+    R.ok("mudar a cor", p["cor"]["tiers"][0]["cor"] != p["nome"]["tiers"][0]["cor"])
+    R.ok("+ tier acrescenta uma linha", len(p["novo"]["tiers"]) == 6 and p["novo"]["tiers"][5]["id"] == "t6")
+    R.ok("reordenar um tier", [t["id"] for t in p["ordem"]["tiers"]][0] == "t3", str([t["id"] for t in p["ordem"]["tiers"]]))
+    R.ok("apagar um tier com filmes devolve-os a por classificar", p["apagado"]["livres"] == [A] and len(p["apagado"]["tiers"]) == 5, str(p["apagado"]))
+    R.ok("sair da edição mostra nomes simples", p["fim"]["tiers"][1]["nome"] in list("SABCD") + ["Novo", "Obras-primas"])
+    R.ok("tudo persistiu ao recarregar", [t["id"] for t in x["tiers"]] == [t["id"] for t in p["fim"]["tiers"]]
+         and any(t["nome"] == "Obras-primas" for t in x["tiers"]), str(x["tiers"]))
+
 R.fim()

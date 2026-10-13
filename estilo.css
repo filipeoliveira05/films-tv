@@ -556,3 +556,24 @@ footer a { color: inherit; }
 
 .tl-fantasma { opacity: 0.35; }
 .tl-arrastado { z-index: 20; opacity: 0.9; box-shadow: 0 6px 18px rgba(0, 0, 0, 0.5); }
+
+.tl-nome {
+  width: 100%;
+  min-width: 0;
+  padding: 0.35rem 0.5rem;
+  font: inherit;
+  font-size: 1rem;
+  color: var(--deep);
+  background: rgba(255, 255, 255, 0.7);
+  border: 1px solid var(--deep);
+  border-radius: 4px;
+}
+
+.editando .tl-tier { grid-template-columns: 1fr; }
+.editando .tl-label { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-start; gap: 0.5rem; text-align: left; }
+.editando .tl-nome { flex: 1 1 8rem; width: auto; }
+.tl-cores { display: flex; gap: 0.25rem; }
+.tl-cor { width: 1.7rem; height: 1.7rem; padding: 0; border: 2px solid transparent; border-radius: 50%; cursor: pointer; }
+.tl-cor[aria-pressed="true"] { border-color: var(--deep); box-shadow: 0 0 0 2px #fff; }
+.tl-grip, .tl-del { width: 2.2rem; height: 2.2rem; padding: 0; font-size: 1.1rem; color: var(--deep); background: rgba(255, 255, 255, 0.45); border: 0; border-radius: 4px; cursor: pointer; }
+.tl-grip { cursor: grab; letter-spacing: -0.2em; }

@@ -87,7 +87,23 @@
     row.dataset.tier = t.id;
     const label = el("div", "tl-label");
     label.style.background = t.cor;
-    label.textContent = t.nome;
+    if (editando) {
+      const nome = el("input", "tl-nome");
+      nome.value = t.nome;
+      nome.maxLength = 24;
+      nome.setAttribute("aria-label", "Nome do tier");
+      const cores = el("div", "tl-cores");
+      T.PALETA.forEach((cor) => {
+        const b = botao("tl-cor", "", `Cor ${cor}`);
+        b.style.background = cor;
+        b.dataset.cor = cor;
+        b.setAttribute("aria-pressed", String(cor === t.cor));
+        cores.append(b);
+      });
+      label.append(botao("tl-grip", "⋮⋮", "Arrastar o tier"), nome, cores, botao("tl-del", "×", `Apagar o tier ${t.nome}`));
+    } else {
+      label.textContent = t.nome;
+    }
     const lista = el("div", "tl-lista");
     lista.dataset.tier = t.id;
     lista.append(...T.listar(estado, t.id).map((id) => cartao(id, true)));
@@ -132,6 +148,19 @@
         })
       );
     });
+    sortables.push(
+      Sortable.create($("#tl-tiers"), {
+        group: "tiers",
+        animation: 150,
+        forceFallback: true,
+        fallbackOnBody: true,
+        handle: ".tl-grip",
+        draggable: ".tl-tier",
+        delay: 150,
+        delayOnTouchOnly: true,
+        onEnd: (evt) => setTimeout(() => soltarTier(evt.item.dataset.tier, evt.newIndex), 0),
+      })
+    );
   };
 
   function pintar() {
@@ -139,6 +168,9 @@
     const livres = $("#tl-livres");
     livres.replaceChildren(...T.naoClassificados(estado, FT.vistos()).map((id) => cartao(id, false)));
     $("#tl-vazio").hidden = livres.children.length > 0;
+    root.classList.toggle("editando", editando);
+    $("#tl-editar").setAttribute("aria-pressed", String(editando));
+    $("#tl-novo-tier").hidden = !editando;
     avisar();
     ativarArrasto();
   }
@@ -162,10 +194,27 @@
     if (!mudar(T.mover(estado, id, tier, idx))) pintar();
   };
 
+  const soltarTier = (id, idx) => {
+    if (!mudar(T.moverTier(estado, id, idx))) pintar();
+  };
+
   root.addEventListener("click", (e) => {
     const x = e.target.closest(".tl-x");
-    if (x) soltar(x.closest(".tl-card").dataset.film, null);
+    if (x) return soltar(x.closest(".tl-card").dataset.film, null);
+    const tier = e.target.closest(".tl-tier");
+    const cor = e.target.closest(".tl-cor");
+    if (cor && tier) return mudar(T.corTier(estado, tier.dataset.tier, cor.dataset.cor));
+    const del = e.target.closest(".tl-del");
+    if (del && tier) return mudar(T.apagarTier(estado, tier.dataset.tier));
   });
+  root.addEventListener("change", (e) => {
+    if (e.target.matches(".tl-nome")) {
+      const antes = estado;
+      if (!mudar(T.renomearTier(estado, e.target.closest(".tl-tier").dataset.tier, e.target.value)) || antes === estado) pintar();
+    }
+  });
+  $("#tl-editar").addEventListener("click", () => { editando = !editando; pintar(); });
+  $("#tl-novo-tier").addEventListener("click", () => mudar(T.adicionarTier(estado)));
 
   window.addEventListener("storage", (e) => {
     if (e.key === KEY || e.key === null) {
@@ -174,7 +223,7 @@
     }
   });
 
-  window.FilmesTV.tierlist = { soltar, estado: () => estado }; // também serve às verificações em tools/
+  window.FilmesTV.tierlist = { soltar, soltarTier, estado: () => estado }; // também serve às verificações em tools/
 
   const vista = (nome) => {
     const tier = nome === "tier";
