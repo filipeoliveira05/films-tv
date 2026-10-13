@@ -300,4 +300,21 @@ if r:
     R.ok("o ✕ continua a devolver o filme a por classificar", x["livres"] == [A], str(x["livres"]))
     R.ok("a seleção desaparece depois de remover", x["selDepois"] == 0)
 
+# ---- S14: o press longo num poster não pode abrir o menu do browser ("abrir imagem noutro separador"), que cancela o arrasto
+r = cena("S14  menu de contexto sobre os posters", query="?v=tierlist", cenario=f"""
+  window.FilmesTV.marcarVisto('{A}', '{B}'); await wait(100);
+  T().soltar('{A}', 't1', 0); await wait(100);
+  const prova = (alvo) => {{ const ev = new MouseEvent('contextmenu', {{ bubbles: true, cancelable: true }}); alvo.dispatchEvent(ev); return ev.defaultPrevented; }};
+  const imgTier = $('#tl-tiers .tl-card[data-film="{A}"] img'), imgLivre = $('#tl-livres .tl-card[data-film="{B}"] img');
+  const css = (e) => ({{ pe: getComputedStyle(e).pointerEvents, sel: getComputedStyle(e.closest('.tl-card')).userSelect }});
+  return {{ tierImg: prova(imgTier), livreImg: prova(imgLivre), tierCartao: prova(imgTier.closest('.tl-card')),
+    fora: prova($('#tl-tiers .tl-label')), css: css(imgTier), cssLivre: css(imgLivre) }};""")
+if r:
+    x = r["r"]
+    R.ok("o menu sobre o poster num tier é evitado", x["tierImg"] and x["tierCartao"], str(x))
+    R.ok("o menu sobre o poster em por classificar é evitado", x["livreImg"], str(x))
+    R.ok("o menu fora dos cartões não é mexido", not x["fora"], str(x))
+    R.ok("a imagem não recebe o toque (o cartão é que o recebe) e o texto não se seleciona",
+         x["css"]["pe"] == "none" and x["css"]["sel"] == "none" and x["cssLivre"]["pe"] == "none", str(x["css"]))
+
 R.fim()

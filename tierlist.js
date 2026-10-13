@@ -309,6 +309,11 @@
     }
   };
 
+  // o press longo é o início do arrasto: sem isto o Chrome mostra o menu ("abrir imagem noutro separador", etc.) e cancela-o
+  root.addEventListener("contextmenu", (e) => {
+    if (e.target.closest(".tl-card")) e.preventDefault();
+  });
+
   // tocar num cartão de um tier mostra o ✕ nele (o hover não existe no telemóvel); tocar noutro sítio esconde-o.
   // A seleção é só visual: não entra no estado e perde-se quando a vista se repinta.
   const selecionar = (card) => {

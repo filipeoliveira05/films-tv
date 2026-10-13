@@ -536,7 +536,7 @@ footer a { color: inherit; }
   -webkit-touch-callout: none;
 }
 
-.tl-card img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.tl-card img { display: block; width: 100%; height: 100%; object-fit: cover; pointer-events: none; -webkit-user-drag: none; }   /* o toque fica no cartão: o press longo numa <img> abriria o menu do browser */
 .tl-sem { display: block; padding: 0.3rem 1.3rem 0.3rem 0.3rem; font-size: 0.7rem; line-height: 1.15; overflow-wrap: anywhere; }
 
 .tl-x {
