@@ -18,6 +18,9 @@ on:
       - estilo.css
       - pagina.js
       - filmes_tv.py
+      - tierlist.js
+      - tierlist_estado.js
+      - vendor/Sortable.min.js
       - .github/workflows/atualizar.yml
 
 # uma execução de cada vez, para dois commits de dados não colidirem

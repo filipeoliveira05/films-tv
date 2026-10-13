@@ -76,7 +76,8 @@ class MarcacaoTest(unittest.TestCase):
         self.assertIn("<button type='button' class='clear' aria-label='Limpar pesquisa' hidden>", nav)
 
     def test_so_ha_um_campo_de_pesquisa(self):
-        self.assertEqual(self.html.count("type='search'"), 1)
+        nav = re.search(r"<nav.*?</nav>", self.html, re.S).group(0)   # a vista Tierlist tem o seu próprio campo, fora da barra
+        self.assertEqual(nav.count("type='search'"), 1)
 
     def test_atalhos_das_seccoes_continuam_na_barra(self):
         nav = re.search(r"<nav.*?</nav>", self.html, re.S).group(0)

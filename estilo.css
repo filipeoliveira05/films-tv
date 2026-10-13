@@ -458,3 +458,23 @@ footer a { color: inherit; }
   .airing { font-size: 0.95rem; }
   .until { display: inline; }
 }
+
+/* ---- tierlist ---- */
+.views { display: flex; gap: 0.4rem; padding-top: 0.6rem; }
+.views[hidden] { display: none; }
+
+.views button {
+  font: inherit;
+  font-size: 0.88rem;
+  font-weight: 600;
+  padding: 0.4rem 0.9rem;
+  color: var(--ink);
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.views button[aria-pressed="true"] { color: var(--deep); background: var(--ink); }
+.jump[data-vista="tier"] .links, .jump[data-vista="tier"] .find { display: none; }
+.jump[data-vista="tier"] .views { padding-bottom: 0.6rem; }

@@ -5,6 +5,7 @@
    Pesquisa: o campo da barra filtra os filmes (e os títulos sem correspondência) por título ou ator.
    Marcas: cada filme tem um botão de visto (olho) e um de guardar (marcador). Guardam-se neste browser
    (localStorage), por filme. "Guardados" mostra só os guardados; "Ocultar vistos" esconde os vistos.
+   A ponte window.FilmesTV serve a vista Tierlist (tierlist.js).
    Para testar: ?t=<milissegundos> simula outra hora e ?q=<texto> abre já com uma pesquisa. */
 (() => {
   "use strict";
@@ -267,6 +268,10 @@
     else airings.forEach((a) => paint(a, now));
   };
 
+  // ponte para a vista Tierlist (tierlist.js): lê e escreve as marcas de visto desta página
+  const marksListeners = [];
+  const notifyMarks = () => marksListeners.forEach((fn) => fn());
+
   loadMarks();
 
   // um clique num botão de uma linha marca o filme em todas as secções onde aparece
@@ -278,6 +283,7 @@
     const set = seen ? marks.vistos : marks.guardados;
     if (!set.delete(id)) set.add(id);
     saveMarks();
+    notifyMarks();
     if ((seen && marks.ocultarVistos) || (!seen && guardadosMode)) {
       render(clock()); // o filme sai da lista
     } else {
@@ -298,6 +304,7 @@
   window.addEventListener("storage", (e) => {
     if (e.key === KEY || e.key === null) {
       loadMarks();
+      notifyMarks();
       render(clock());
     }
   });
@@ -335,6 +342,30 @@
   } else {
     render(clock());
   }
+  window.FilmesTV = {
+    vistos: () => new Set(marks.vistos),
+    marcarVisto: (...ids) => {
+      const novos = ids.filter((id) => !marks.vistos.has(id));
+      if (!novos.length) return;
+      novos.forEach((id) => marks.vistos.add(id));
+      saveMarks();
+      render(clock());
+      notifyMarks();
+    },
+    aoMudarMarcas: (fn) => marksListeners.push(fn),
+    metaFilme: (id) => {
+      const f = films.get(id);
+      if (!f) return null;
+      const a = f.shell.querySelector("h3 a");
+      const y = f.shell.querySelector("h3 .y");
+      const img = f.shell.querySelector(".poster img");
+      return {
+        titulo: a ? a.textContent : "",
+        ano: y ? y.textContent.replace(/\D/g, "") : null,
+        poster: img ? img.getAttribute("src") : null,
+      };
+    },
+  };
   setInterval(update, 60000);
   document.addEventListener("visibilitychange", () => {
     if (!document.hidden) update();

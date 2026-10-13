@@ -718,6 +718,50 @@ def film_item(f, airings, kind, now):
     )
 
 
+def asset(nome):
+    return (Path(__file__).parent / nome).read_text(encoding="utf-8")
+
+
+def views_html():
+    """Comutador entre a grelha e a tierlist; escondido até o JavaScript o mostrar."""
+    return (
+        "<div class='views' hidden>"
+        "<button type='button' id='v-tv' aria-pressed='true'>Na TV</button>"
+        "<button type='button' id='v-tier' aria-pressed='false'>Tierlist</button></div>"
+    )
+
+
+def tierlist_html():
+    """Esqueleto da vista Tierlist; o conteúdo é todo desenhado por tierlist.js."""
+    return (
+        "<main class='wrap' id='main-tier' hidden>"
+        "<div id='h-tierlist' class='tl-titulo' role='heading' aria-level='2'>A minha tierlist</div>"
+        "<div class='tl-barra'>"
+        "<button type='button' class='tl-btn' id='tl-editar' aria-pressed='false'>Editar tiers</button>"
+        "<button type='button' class='tl-btn' id='tl-exportar'>Exportar</button>"
+        "<button type='button' class='tl-btn' id='tl-importar'>Importar</button>"
+        "<input type='file' id='tl-ficheiro' accept='application/json,.json' hidden></div>"
+        "<p class='tl-aviso' id='tl-aviso' hidden>Sem armazenamento neste browser: a tierlist só vale enquanto a página "
+        "estiver aberta. Usa Exportar para a guardar.</p>"
+        "<div id='tl-tiers'></div>"
+        "<button type='button' class='tl-btn' id='tl-novo-tier' hidden>+ tier</button>"
+        "<h3 class='tl-sub'>Por classificar</h3>"
+        "<div class='tl-lista' id='tl-livres'></div>"
+        "<p class='tl-vazio' id='tl-vazio'>Nada por classificar. Marca filmes como vistos na grelha ou procura um filme abaixo.</p>"
+        "<h3 class='tl-sub'>Adicionar um filme</h3>"
+        "<input type='search' id='tl-q' class='tl-campo' placeholder='Pesquisar filme para adicionar' "
+        "aria-label='Pesquisar filme para adicionar' autocomplete='off' spellcheck='false'>"
+        "<div id='tl-chave' class='tl-chave' hidden>"
+        "<p>Cola a tua chave da API v3 do <a href='https://www.themoviedb.org/settings/api'>TMDB</a>. "
+        "Fica guardada só neste browser.</p>"
+        "<input type='password' id='tl-chave-input' class='tl-campo' aria-label='Chave TMDB' autocomplete='off'>"
+        "<button type='button' class='tl-btn' id='tl-chave-ok'>Guardar chave</button></div>"
+        "<p class='tl-msg' id='tl-msg' role='status' hidden></p>"
+        "<ul class='tl-resultados' id='tl-resultados'></ul>"
+        "</main>"
+    )
+
+
 def report(db, now=None, stamp=None):
     now = now or now_lisbon()
     since = (now - timedelta(days=CATCHUP_DAYS)).isoformat()
@@ -764,7 +808,7 @@ def report(db, now=None, stamp=None):
         "<body>",
         "<header class='top'><div class='wrap'><h1>Filmes na TV</h1>"
         f"<p>Ordenados por rating IMDb.</p><p class='stamp'>Atualizado {fmt_when(stamp or now)}</p></div></header>",
-        "<nav class='jump' aria-label='Secções'><div class='wrap'><div class='links'>"
+        "<nav class='jump' aria-label='Secções' data-vista='tv'><div class='wrap'>" + views_html() + "<div class='links'>"
         + "".join(
             f"<a href='#{sid}'{HIDDEN if sid == 'agora' and not items else ''}>"
             f"<span class='i-{sid}'>{ICONS[sid]}</span>{name} <b>{len(items)}</b></a>"
@@ -779,7 +823,7 @@ def report(db, now=None, stamp=None):
         "<button type='button' class='tool' id='f-vistos' aria-pressed='false' "
         f"aria-label='Ocultar vistos' title='Ocultar vistos'>{MARK_ICONS['eye-off']}<b class='n'>0</b></button>"
         "</div></div></nav>",
-        "<main class='wrap'>",
+        "<main class='wrap' id='main-tv'>",
     ]
     notice = history_notice(db, now)
     if notice:
@@ -804,8 +848,14 @@ def report(db, now=None, stamp=None):
             + "</ul></details>"
         )
     parts.append("</main>")
+    parts.append(tierlist_html())
     parts.append(footer_html())
-    parts.append("<script>" + Path(__file__).with_name("pagina.js").read_text(encoding="utf-8") + "</script>")
+    parts.append(
+        "<script>" + asset("vendor/Sortable.min.js") + "</script>"
+        "<script>" + asset("tierlist_estado.js") + "</script>"
+        "<script>" + asset("pagina.js") + "</script>"
+        "<script>" + asset("tierlist.js") + "</script>"
+    )
     Path(OUT_PATH).write_text("\n".join(parts), encoding="utf-8")
     print(f"\n{', '.join(f'{n}: {c}' for n, c in counts.items())}; {len(unmatched)} sem correspondência -> {OUT_PATH}")
 

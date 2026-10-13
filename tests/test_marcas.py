@@ -80,7 +80,8 @@ class MarcacaoDasMarcasTest(unittest.TestCase):
             self.assertIn(f"data-icon='{nome}'", self.html)
 
     def test_pesquisa_continua_a_ter_um_so_campo(self):
-        self.assertEqual(self.html.count("type='search'"), 1)
+        nav = re.search(r"<nav.*?</nav>", self.html, re.S).group(0)   # a vista Tierlist tem o seu próprio campo, fora da barra
+        self.assertEqual(nav.count("type='search'"), 1)
 
 
 if __name__ == "__main__":
