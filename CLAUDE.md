@@ -22,7 +22,7 @@ Limitação a ter presente: a página mostra o que passou na grelha, não o que 
 - Resultado final: página no **GitHub Pages** (`filmes.html`), aberta no telemóvel através de um marcador.
 - `TMDB_API_KEY` guardada como *secret* do repositório, nunca no código.
 - Persistência entre execuções (decidido: no repo): `data/airings.csv` e `data/matches.csv` (ordenados, gerados por `export_state`, lidos por `import_state`); o Actions faz commit deles. O dataset de ratings do IMDb não se guarda; volta a ser descarregado em cada execução (~8 MB comprimidos). Decisão A sobre os termos do site: repo e página públicos com a grelha, assumido pelo utilizador.
-- Cron diário às 05:17 UTC (06:17 Lisboa no verão, 05:17 no inverno; minuto fora de hora cheia por causa dos atrasos, mudado em 2026-10-12 — por confirmar se melhora), em `.github/workflows/atualizar.yml`. Se nenhum canal for lido, o script falha de propósito em vez de publicar dados antigos. Página: https://filipeoliveira05.github.io/films-tv/
+- Cron diário configurado para as 05:17 UTC (06:17 Lisboa no verão). **Na prática a execução agendada corre por volta das 12:00 de Lisboa** (o GitHub atrasa-a); o utilizador aceitou isto e dispara o workflow à mão de manhã quando quer a página fresca, antes dessa hora. Não é um problema a resolver. Definido em `.github/workflows/atualizar.yml`. Se nenhum canal for lido, o script falha de propósito em vez de publicar dados antigos. Página: https://filipeoliveira05.github.io/films-tv/
 
 ## Estado atual
 
@@ -34,7 +34,7 @@ Limitação a ter presente: a página mostra o que passou na grelha, não o que 
 **Validado em 2026-10-05 (execução local):** scraping dos 16 canais (~2300 programas, 3 a 10 de outubro, 0 avisos de "0 programas"), parser com testes (`python -m unittest discover -s tests`), datas ("Hoje" do site = data local, confirmado com a página "No AR"). robots.txt só proíbe `/ajax/` e `/cgi-bin/`.
 **Matching TMDB (2026-10-05, 725 títulos):** 582 com correspondência, 143 sem. A 1.ª versão (só duração) dava 624 mas com erros graves (ex.: "Inferno" -> *Insidious Inferno*, "Bird" -> *Lady Bird*); a regra atual troca cobertura por precisão. O topo da lista foi revisto à mão e está correto. Ambiguidades por remakes com o mesmo título (Annie, Shaft, Passageiros) dependem só da duração e podem falhar. Os `(VP)` e a versão original aparecem como entradas separadas. Filmes de TV/Natal com título local ficam sem correspondência.
 **Também validado:** download do dataset IMDb (1,7 M ratings em ~5 s) e geração do `filmes.html`.
-**Validado no GitHub (2026-10-05, execução manual):** os servidores do GitHub conseguem ler o tudonumclick.com (16 canais, mesmos totais que localmente), testes e deploy para o Pages passaram, a página está online. **Cron e bot (verificado em 2026-10-12 com `gh run list`):** o cron (`schedule`) corre todos os dias e o bot faz commit de `data/`, mas o GitHub atrasa-o muito: as execuções agendadas começam por volta das 11:30 UTC e não às 05:00 (o utilizador tem disparado o workflow à mão de manhã). Uma falhou (11/10): *timeout* de ligação na primeira chamada ao site (`discover_slugs`), sem retentativa; corrigido com `RETRY_WAITS` em `get()` e recurso a `KNOWN_SLUGS`. **Primeira execução completa com poster, elenco e marcas (2026-10-13, disparo manual):** passou; 90 filmes novos identificados e 0 por preencher em poster e elenco (os novos trazem ambos do matching); o bot fez commit. Por validar: se o cron das 05:17 UTC chega a horas (às 07:00 UTC de 13/10 ainda não tinha corrido) e o aspeto/toque no telemóvel.
+**Validado no GitHub (2026-10-05, execução manual):** os servidores do GitHub conseguem ler o tudonumclick.com (16 canais, mesmos totais que localmente), testes e deploy para o Pages passaram, a página está online. **Cron e bot (verificado em 2026-10-12 com `gh run list`):** o cron (`schedule`) corre todos os dias e o bot faz commit de `data/`, mas o GitHub atrasa-o muito: as execuções agendadas começam por volta das 11:30 UTC e não às 05:00 (o utilizador tem disparado o workflow à mão de manhã). Uma falhou (11/10): *timeout* de ligação na primeira chamada ao site (`discover_slugs`), sem retentativa; corrigido com `RETRY_WAITS` em `get()` e recurso a `KNOWN_SLUGS`. **Primeira execução completa com poster, elenco e marcas (2026-10-13, disparo manual):** passou; 90 filmes novos identificados e 0 por preencher em poster e elenco (os novos trazem ambos do matching); o bot fez commit. Por validar: o aspeto/toque no telemóvel.
 
 Achados do HTML real: cada programa é um `div.channel_data` com a hora em `<b>HH:MM às HH:MM</b>` e o título em `<b class="ml10 dib">`; a página de cada dia **abre com o programa da noite anterior que atravessa a meia-noite** (o parser data-o no dia anterior). O NOS Studios tem emissões sobrepostas no próprio site (15 sobreposições). Alguns títulos trazem o ano, ex. "Pinóquio (2019)", e séries ("T12 - Ep. 3") passam o filtro de duração.
 
@@ -46,7 +46,7 @@ Achados do HTML real: cada programa é um `div.channel_data` com a hora em `<b>H
 - **Modo completo** (cron e disparo manual): corre os testes, `python filmes_tv.py` (scraping, matching, posters, elenco, ratings, página), faz commit de `data/` com `git pull --rebase` antes do push (aguenta pushes teus a meio) e publica no Pages. Se nenhum canal for lido, falha de propósito e não publica.
 - **Modo "só página"** (push, ou disparo manual com a opção): `python filmes_tv.py --relatorio` cria a base de dados do zero, importa `data/*.csv`, descarrega os ratings e gera a página. **Sem pedidos ao tudonumclick.com nem ao TMDB**, não precisa da chave e não faz commit. O `checkout` usa a ponta do ramo, para apanhar os dados mais recentes do bot.
 - `concurrency: filmes` (uma execução de cada vez). `data/atualizado.txt` é reescrito em cada execução completa, por isso o bot faz commit todos os dias.
-- **O cron do GitHub atrasa muito** (horas; já falhou uma vez por timeout do site, entretanto tratado com retentativas). Dispara-se à mão (`gh workflow run atualizar.yml`) quando se quer a página fresca de manhã.
+- **O cron agendado corre por volta das 12:00 de Lisboa**, não à hora configurada: o GitHub atrasa as execuções agendadas (aceite pelo utilizador, que dispara à mão de manhã com `gh workflow run atualizar.yml` ou pelo separador Actions). Já falhou uma vez por timeout do site (11/10), entretanto tratado com retentativas.
 - Versões das actions: `checkout@v4`, `setup-python@v5`, `upload-pages-artifact@v3`, `deploy-pages@v4`. O GitHub avisa que `checkout` e `setup-python` correm em Node 20 (descontinuado); rever.
 
 ## Design da página
@@ -153,7 +153,7 @@ O Cinemundo foi retirado de propósito. Não voltar a acrescentar.
 ## Riscos conhecidos / a verificar
 
 - **Origem dos horários:** o parser depende da estrutura HTML do tudonumclick.com (um `div.channel_data` por programa). Se mudar, o script avisa com "0 programas lidos" por canal e, se nenhum canal for lido, falha de propósito. Termos do site: zona cinzenta assumida (opção A).
-- **Cron do GitHub** atrasado ou falhado (ver "GitHub Actions"); a "Para gravar" só fica completa com execuções diárias (um dia falhado é recuperado pelo "ontem" do site, dois seguidos perdem um dia).
+- **Cron do GitHub** falhado (o atraso habitual está aceite, ver "GitHub Actions"); a "Para gravar" só fica completa com execuções diárias (um dia falhado é recuperado pelo "ontem" do site, dois seguidos perdem um dia).
 - **Matching:** remakes com o mesmo título dependem só da duração; filmes de TV/Natal com título local ficam sem correspondência; um match errado mostra também o poster e o elenco errados.
 - **Dependências externas da página:** Google Fonts (sem rede cai para a fonte do sistema) e `image.tmdb.org` (posters); os termos do TMDB exigem a atribuição que está no rodapé.
 - **Marcas só no browser:** limpar os dados do browser apaga-as; telemóvel e computador não partilham.
@@ -184,7 +184,7 @@ Estado em 2026-10-13: tudo está commitado e enviado para o GitHub; a página on
 
 Forma de trabalhar combinada: antes de uma funcionalidade nova, perguntas **uma de cada vez** com opções e recomendação, depois um desenho curto e só se implementa com aprovação; testes primeiro; para mudanças de aspeto, ver capturas (`tools/capturar.py`); nunca fazer `git push` sem o utilizador pedir (regra global); fazer `git pull` antes de mexer, porque o bot atualiza `data/` todos os dias.
 
-Pendente, por ordem de interesse: (1) confirmar se o cron das 05:17 UTC chega a horas; (2) ver a página num telemóvel real; (3) pesquisa por canal (filtro por emissão, precisa de desenho); (4) poda de `matches` (adiada); (5) exportar/importar as marcas.
+Pendente, por ordem de interesse: (1) ver a página num telemóvel real; (2) pesquisa por canal (filtro por emissão, precisa de desenho); (3) poda de `matches` (adiada); (4) exportar/importar as marcas.
 
 ## Convenções
 
