@@ -54,6 +54,42 @@ def dump(url, orcamento=5000):
     return r.stdout
 
 
+def correr(html, cenario, pre="", query="", fase2="", nome="cenario.html", orcamento=20000):
+    """Injeta `cenario` (corpo de uma função async) na página, corre-a no Chromium e devolve o que devolveu.
+
+    `pre` corre antes de tudo (p. ex. localStorage ou fetch simulado). Com `fase2`, a página recarrega depois
+    da fase 1 e corre a fase 2 (para provar que o estado sobrevive). Devolve {"ok", "r", "fase1"} ou {"ok": False, "erro"}.
+    """
+    import json as _json
+    from bs4 import BeautifulSoup
+
+    corpo = f"""<script>
+const $ = (s, r = document) => r.querySelector(s), $$ = (s, r = document) => [...r.querySelectorAll(s)];
+const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+const click = async (el) => {{ el.click(); await wait(200); }};
+(async () => {{
+  const out = (o) => {{ document.body.dataset.res = JSON.stringify(o); }};
+  try {{
+    if ({_json.dumps(bool(fase2))} && sessionStorage.getItem('fase') === '2') {{
+      const r = await (async () => {{ {fase2} }})();
+      out({{ ok: true, r, fase1: JSON.parse(sessionStorage.getItem('r1') || 'null') }});
+    }} else {{
+      const r = await (async () => {{ {cenario} }})();
+      if ({_json.dumps(bool(fase2))}) {{ sessionStorage.setItem('r1', JSON.stringify(r)); sessionStorage.setItem('fase', '2'); location.reload(); }}
+      else out({{ ok: true, r }});
+    }}
+  }} catch (e) {{ out({{ ok: false, erro: String(e) }}); }}
+}})();
+</script>"""
+    html = html.replace("<meta charset='utf-8'>", "<meta charset='utf-8'><script>" + pre + "</script>", 1) + corpo
+    caminho = TMP / nome
+    caminho.write_text(html, encoding="utf-8")
+    dom = subprocess.run([BROWSER, "--no-sandbox", "--disable-gpu", f"--virtual-time-budget={orcamento}", "--dump-dom",
+                          f"file://{caminho}{query}"], capture_output=True, text=True, timeout=240).stdout
+    res = BeautifulSoup(dom, "html.parser").body.get("data-res")
+    return _json.loads(res) if res else {"ok": False, "erro": "sem resultado (a página não correu o cenário)"}
+
+
 class Resultados:
     def __init__(self):
         self.falhas = []
