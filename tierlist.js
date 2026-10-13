@@ -327,6 +327,38 @@
   $("#tl-editar").addEventListener("click", () => { editando = !editando; pintar(); });
   $("#tl-novo-tier").addEventListener("click", () => mudar(T.adicionarTier(estado)));
 
+  const exportarFicheiro = () => {
+    const blob = new Blob([T.exportar(estado)], { type: "application/json" });
+    const a = el("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `tierlist-${new Date().toISOString().slice(0, 10)}.json`;
+    document.body.append(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  };
+
+  // devolve true se a tierlist foi substituída; recusa lixo sem tocar nos dados atuais
+  const importarTexto = (texto) => {
+    const r = T.importar(texto);
+    if (!r.ok) {
+      alert(r.erro);
+      return false;
+    }
+    if (!confirm("Importar substitui a tierlist atual. Continuar?")) return false;
+    mudar(r.estado);
+    FT.marcarVisto(...Object.keys(r.estado.itens)); // um filme na tierlist conta como visto
+    return true;
+  };
+
+  $("#tl-exportar").addEventListener("click", exportarFicheiro);
+  $("#tl-importar").addEventListener("click", () => $("#tl-ficheiro").click());
+  $("#tl-ficheiro").addEventListener("change", async (e) => {
+    const ficheiro = e.target.files[0];
+    e.target.value = "";
+    if (ficheiro) importarTexto(await ficheiro.text());
+  });
+
   let timer;
   $("#tl-q").addEventListener("input", (e) => {
     clearTimeout(timer);
@@ -352,7 +384,7 @@
     }
   });
 
-  window.FilmesTV.tierlist = { soltar, soltarTier, estado: () => estado }; // também serve às verificações em tools/
+  window.FilmesTV.tierlist = { soltar, soltarTier, importarTexto, estado: () => estado }; // também serve às verificações em tools/
 
   const vista = (nome) => {
     const tier = nome === "tier";

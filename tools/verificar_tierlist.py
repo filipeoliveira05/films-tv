@@ -237,4 +237,41 @@ if r:
     R.ok("401 apaga a chave e pede outra", x["recusada"]["guardada"] is None and x["recusada"]["chave"], str(x["recusada"]))
     R.ok("sem rede: mensagem e a tierlist continua", x["semRede"]["msg"] and "ligação" in x["semRede"]["msg"] and x["tiers"] == 5, str(x["semRede"]["msg"]))
 
+# ---- S11: exportar / importar (Review Focus 1)
+r = cena("S11  exportar e importar", query="?v=tierlist", cenario=f"""
+  window.FilmesTV.marcarVisto('{A}'); await wait(100);
+  T().soltar('{A}', 't2', 0); await wait(100);
+  let descarregado = null;
+  const criar = URL.createObjectURL;
+  URL.createObjectURL = (blob) => {{ descarregado = blob; return criar.call(URL, blob); }};
+  await click($('#tl-exportar')); await wait(200);
+  const texto = descarregado ? await descarregado.text() : null;
+  window.alert = () => {{}};
+  window.confirm = () => false;
+  const recusado = T().importarTexto(texto); const semMudar = snap();
+  T().soltar('{A}', 't4', 0); await wait(100);
+  window.confirm = () => true;
+  const mau = T().importarTexto('isto não é json'); const aposMau = snap();
+  const bom = T().importarTexto(texto); await wait(150);
+  return {{ texto, recusado, semMudar, mau, aposMau, bom, fim: snap(), marcas: localStorage.getItem('filmes-tv:marcas') }};""")
+if r:
+    x = r["r"]
+    R.ok("exportar gera JSON com a versão e o filme", x["texto"] and json.loads(x["texto"])["v"] == 1 and A in json.loads(x["texto"])["itens"])
+    R.ok("importar recusado pelo utilizador não muda nada", x["recusado"] is False and x["semMudar"]["tiers"][1]["filmes"] == [A])
+    R.ok("ficheiro inválido é recusado e a tierlist fica como estava", x["mau"] is False and x["aposMau"]["tiers"][3]["filmes"] == [A], str(x["aposMau"]["tiers"]))
+    R.ok("importar válido substitui a tierlist", x["bom"] is True and x["fim"]["tiers"][1]["filmes"] == [A] and x["fim"]["tiers"][3]["filmes"] == [])
+    R.ok("os importados contam como vistos", A in json.loads(x["marcas"])["vistos"])
+
+# ---- S12: localStorage bloqueado
+BLOQUEIO = "Object.defineProperty(window, 'localStorage', { get() { throw new Error('bloqueado'); } });"
+r = cena("S12  armazenamento bloqueado", query="?v=tierlist", pre=BLOQUEIO, cenario=f"""
+  const inicio = {{ aviso: !$('#tl-aviso').hidden }};
+  window.FilmesTV.marcarVisto('{A}'); await wait(100);
+  T().soltar('{A}', 't1', 0); await wait(100);
+  return {{ inicio, aviso: !$('#tl-aviso').hidden, tier: $$('#tl-tiers .tl-tier')[0].querySelectorAll('.tl-card').length }};""")
+if r:
+    x = r["r"]
+    R.ok("mostra o aviso de que só vale nesta sessão", x["aviso"])
+    R.ok("continua a funcionar em memória", x["tier"] == 1)
+
 R.fim()
