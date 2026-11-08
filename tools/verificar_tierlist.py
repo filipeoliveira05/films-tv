@@ -326,7 +326,7 @@ ids.forEach((id, i) => T().soltar(id, 't1', i)); await wait(100);
 const D = '#tl-duelos-corpo';
 const cartas = () => $$(D + ' .tl-dl-card').map((c) => c.dataset.film);
 const abrirTier = async () => { await click($('#tl-duelos')); await click($(D + ' .tl-dl-tier[data-tier="t1"]')); };
-const responder = async (ganha) => click($(D + ' .tl-dl-card[data-film="' + ganha + '"]'));
+const responder = async (ganha) => { click($(D + ' .tl-dl-card[data-film="' + ganha + '"]')); await click($('#tl-dl-confirmar')); };
 const jogar = async (quem) => { let n = 0; while (cartas().length === 2 && n < 40) { const [a, b] = cartas(); await responder(quem(a, b)); n++; } return n; };
 const ordem = () => $$(D + ' .tl-dl-ordem li').map((li) => li.dataset.film);
 const aviso = () => ($(D + ' .tl-dl-aviso') ? $(D + ' .tl-dl-aviso').textContent : null);
@@ -400,10 +400,49 @@ if r:
 
 r = duelos("""
   await abrirTier();
-  while (cartas().length === 2) await click($('#tl-dl-empate'));
+  while (cartas().length === 2) { await click($(D + ' .tl-dl-op[data-cat="geral"][data-val="="]')); await click($('#tl-dl-confirmar')); };
   return { av: aviso(), ordem: ordem(), n: gravados() };""", titulo="S19  empates não geram contradições")
 if r:
     R.ok("todos empatados: sem aviso e 4 filmes na ordem", r["r"]["av"] is None and len(r["r"]["ordem"]) == 4 and r["r"]["n"] == 6, str(r["r"]))
+
+# ---- S21: categorias do duelo (Confirmar só com Melhor filme, pontuação em direto, guardado por categoria)
+r = duelos("""
+  await abrirTier();
+  const [x, y] = cartas();   // x à esquerda, y à direita
+  const op = (cat, val) => $(D + ' .tl-dl-op[data-cat="' + cat + '"][data-val="' + val + '"]');
+  const antes = { confirmar: $('#tl-dl-confirmar').disabled, resumo: $('#tl-dl-resumo').textContent, nomes: $$(D + ' .tl-dl-cat-nome').map((e) => e.textContent) };
+  await click(op('opiniao', y)); await click(op('plot', x));        // sem Melhor filme: continua bloqueado
+  const bloqueado = $('#tl-dl-confirmar').disabled;
+  await click(op('geral', x));
+  const resumo = $$(D + ' .tl-dl-total').map((t) => t.dataset.film + '=' + t.textContent).join(' ');
+  const ativos = $$(D + ' .tl-dl-op.tl-on').map((o) => o.dataset.cat + ':' + (o.dataset.val === x ? 'x' : o.dataset.val === y ? 'y' : '='));
+  const cx = (e) => { const r = e.getBoundingClientRect(); return r.x + r.width / 2; };
+  const alinhado = Math.abs(cx(op('geral', x)) - cx($(D + ' .tl-dl-card[data-film="' + x + '"]'))) < 2 && Math.abs(cx(op('plot', y)) - cx($(D + ' .tl-dl-card[data-film="' + y + '"]'))) < 2;
+  await click($('#tl-dl-confirmar'));
+  const guardado = JSON.parse(localStorage.getItem('filmes-tv:duelos')).res;
+  return { antes, bloqueado, resumo, ativos, alinhado, guardado: Object.values(guardado)[0], x, y, proximo: $(D + ' .tl-dl-barra').textContent };""", titulo="S21  categorias do duelo")
+if r:
+    x = r["r"]
+    R.ok("Confirmar bloqueado sem Melhor filme; categorias com os nomes e pesos pedidos",
+         x["antes"]["confirmar"] and x["bloqueado"] and x["antes"]["nomes"] == ["Melhor filme (3)", "Opinião pessoal (2)", "Plot (1)", "Acting (1)", "Cinematografia (1)"], str(x["antes"]))
+    # x ganha geral (3) e plot (1); y ganha opinião (2); acting e cinema empatam (1 cada): x = 4+1 = 5, y = 2+1 = 3
+    R.ok("total de cada filme em direto: 5 e 3", x["resumo"] == f'{x["x"]}=5 {x["y"]}=3', x["resumo"])
+    R.ok("os botões ficam por baixo do poster do próprio filme (mesma coluna)", x["alinhado"], str(x["alinhado"]))
+    R.ok("botões ativos refletem a escolha", sorted(x["ativos"]) == sorted(["geral:x", "opiniao:y", "plot:x", "acting:=", "cinema:="]), str(x["ativos"]))
+    g = x["guardado"]
+    R.ok("guardado por categoria (acting/cinema em falta = empate)", g == {"geral": x["x"], "opiniao": x["y"], "plot": x["x"]}, str(g))
+    R.ok("passa ao duelo seguinte", "Duelo 2" in x["proximo"], x["proximo"])
+
+# ---- S22: duelos antigos (valor = vencedor) continuam a valer
+r = duelos("""
+  const [a, b] = ids.slice(0, 2).sort();
+  localStorage.setItem('filmes-tv:duelos', JSON.stringify({ v: 1, res: { [a + '|' + b]: a } }));
+  await click($('#tl-duelos-sair'));
+  return {};""", titulo="S22  duelo antigo continua a contar", fase2="""
+  await click($('#tl-duelos'));
+  return { t1: $('#tl-duelos-corpo .tl-dl-tier[data-tier="t1"]').textContent };""")
+if r:
+    R.ok("um duelo no formato antigo conta como feito (1/6)", "1/6" in r["r"]["t1"], str(r["r"]))
 
 # ---- S20: o progresso dos duelos vai no Exportar e volta com o Importar (sem apagar os que já existem)
 PEGAR = """
@@ -419,7 +458,7 @@ r = duelos(PEGAR + """
   const texto = await exportar();
   const j = JSON.parse(texto);
   const semDuelos = await (async () => { localStorage.removeItem('filmes-tv:duelos'); return null; })();
-  return { texto, chaves: Object.keys(j.duelos || {}), validos: Object.values(j.duelos || {}).every((w) => typeof w === 'string'), v: j.v };""",
+  return { texto, chaves: Object.keys(j.duelos || {}), validos: Object.values(j.duelos || {}).every((w) => typeof w === 'object' && typeof w.geral === 'string'), v: j.v };""",
          titulo="S20  exportar leva os duelos; importar junta-os", fase2="""
   const texto = JSON.parse(sessionStorage.getItem('r1')).texto;
   const gravados = () => Object.keys((JSON.parse(localStorage.getItem('filmes-tv:duelos') || '{"res":{}}')).res).length;

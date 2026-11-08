@@ -69,8 +69,12 @@ if a.duelos:
       if (%d >= 2) { let i = 0; while ($$('#tl-duelos-corpo .tl-dl-card').length === 2 && i < 80) {
         const [a, b] = $$('#tl-duelos-corpo .tl-dl-card').map((c) => c.dataset.film); const n = i++;
         const ganha = (%d === 3 && n %% 4 === 3) ? (a < b ? b : a) : (a < b ? a : b);   // no modo conflito inverte alguns duelos
-        $('#tl-duelos-corpo .tl-dl-card[data-film="' + ganha + '"]').click(); await w(30); } }
-    }, 300);</script>""" % (passos, passos, passos)
+        $('#tl-duelos-corpo .tl-dl-card[data-film="' + ganha + '"]').click(); $('#tl-dl-confirmar').click(); await w(30); } }
+      if (%d === 1) { const [x, y] = $$('#tl-duelos-corpo .tl-dl-card').map((c) => c.dataset.film);   // um duelo a meio, com categorias escolhidas
+        $('#tl-duelos-corpo .tl-dl-card[data-film="' + x + '"]').click();
+        $('#tl-duelos-corpo .tl-dl-op[data-cat="opiniao"][data-val="' + y + '"]').click();
+        $('#tl-duelos-corpo .tl-dl-op[data-cat="plot"][data-val="' + x + '"]').click(); }
+    }, 300);</script>""" % (passos, passos, passos, passos)
 if a.editar:
     depois += "<script>setTimeout(() => document.getElementById('tl-editar').click(), 200);</script>"
 html = html.replace("<meta charset='utf-8'>", f"<meta charset='utf-8'><script>{pre}</script>", 1)
