@@ -444,6 +444,49 @@ r = duelos("""
 if r:
     R.ok("um duelo no formato antigo conta como feito (1/6)", "1/6" in r["r"]["t1"], str(r["r"]))
 
+# ---- S23: "Refazer com categorias": os duelos antigos só são substituídos quando respondidos de novo
+r = duelos("""
+  window.confirm = () => true;
+  const par = (x, y) => (x < y ? x + '|' + y : y + '|' + x);
+  const antigos = {};
+  for (let i = 0; i < ids.length; i++) for (let j = i + 1; j < ids.length; j++) antigos[par(ids[i], ids[j])] = ids[i];   // formato antigo, completo
+  localStorage.setItem('filmes-tv:duelos', JSON.stringify({ v: 1, res: antigos }));
+  await click($('#tl-duelos'));
+  const antes = $(D + ' .tl-dl-tier[data-tier="t1"]').textContent;
+  const tem = !!$(D + ' .tl-dl-refazer[data-tier="t1"]');
+  const semOutro = !$(D + ' .tl-dl-refazer[data-tier="t2"]');
+  await click($(D + ' .tl-dl-refazer[data-tier="t1"]'));
+  const barra = $(D + ' .tl-dl-barra').textContent;
+  for (let n = 0; n < 2; n++) {
+    const [x] = cartas();
+    await click($(D + ' .tl-dl-card[data-film="' + x + '"]'));
+    await click($(D + ' .tl-dl-op[data-cat="plot"][data-val="="]'));
+    await click($('#tl-dl-confirmar'));
+  }
+  const st = JSON.parse(localStorage.getItem('filmes-tv:duelos'));
+  const novos = Object.values(st.res).filter((v) => v.plot === '=').length;   // os refeitos têm a categoria Plot escolhida
+  return { antes, tem, semOutro, barra, novos, antigosRestantes: Object.values(st.res).filter((v) => Object.keys(v).length === 1).length, pendentes: st.refazer.length };""",
+         titulo="S23  refazer com categorias", fase2="""
+  const D = '#tl-duelos-corpo';
+  const cartas = () => $$(D + ' .tl-dl-card').map((c) => c.dataset.film);
+  const ordem = () => $$(D + ' .tl-dl-ordem li').map((li) => li.dataset.film);
+  const responder = async (ganha) => { click($(D + ' .tl-dl-card[data-film="' + ganha + '"]')); await click($('#tl-dl-confirmar')); };
+  await click($('#tl-duelos'));
+  const menu = $(D + ' .tl-dl-tier[data-tier="t1"]').textContent;
+  await click($(D + ' .tl-dl-tier[data-tier="t1"]'));
+  const barra = $(D + ' .tl-dl-barra').textContent;
+  let n = 0;
+  while (cartas().length === 2 && n < 20) { await responder(cartas()[0]); n++; }
+  const st = JSON.parse(localStorage.getItem('filmes-tv:duelos'));
+  return { menu, barra, n, refazer: st.refazer.length, todosNovos: Object.values(st.res).every((v) => typeof v === 'object'), ordem: ordem().length };""")
+if r:
+    x, y = r["fase1"], r["r"]
+    R.ok("tier completo antes: 6/6; botão só no tier com duelos", "6/6" in x["antes"] and x["tem"] and x["semOutro"], str(x))
+    R.ok("refazer começa do 1.º duelo de 6", "Duelo 1 de 6" in x["barra"], x["barra"])
+    R.ok("2 refeitos ficam por categorias e os outros 4 mantêm o resultado antigo", x["novos"] == 2 and x["antigosRestantes"] == 4 and x["pendentes"] == 4, str(x))
+    R.ok("depois de recarregar: 2/6, continuar mostra os 4 que faltam refazer", "2/6" in y["menu"] and "Duelo 1 de 4" in y["barra"], str(y))
+    R.ok("no fim não ficam pares por refazer, todos os duelos são por categorias e há ordem", y["n"] == 4 and y["refazer"] == 0 and y["todosNovos"] and y["ordem"] == 4, str(y))
+
 # ---- S20: o progresso dos duelos vai no Exportar e volta com o Importar (sem apagar os que já existem)
 PEGAR = """
 let descarregado = null;

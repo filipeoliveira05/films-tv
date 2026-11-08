@@ -88,11 +88,19 @@ const TierDuelos = (() => {
   // junta dois conjuntos de resultados (p. ex. ao importar): no mesmo par vale o segundo
   const juntar = (a, b) => ({ ...(a || {}), ...(b || {}) });
 
-  const pendentes = (res, ids) => pares(ids).filter(([a, b]) => !tem(res, a, b));
-  const progresso = (res, ids) => {
+  // `refazer`: chaves de pares já feitos que o utilizador quer repetir; contam como por fazer até serem respondidos de novo
+  const pendentes = (res, ids, refazer = []) => pares(ids).filter(([a, b]) => !tem(res, a, b) || refazer.includes(chave(a, b)));
+  const progresso = (res, ids, refazer = []) => {
     const total = pares(ids).length;
-    return { feitos: total - pendentes(res, ids).length, total };
+    return { feitos: total - pendentes(res, ids, refazer).length, total };
   };
+  // junta à lista os pares já feitos deste conjunto (os por fazer já estão pendentes)
+  const marcarRefazer = (refazer, res, ids) => {
+    const r = [...refazer];
+    for (const [a, b] of pares(ids)) if (tem(res, a, b) && !r.includes(chave(a, b))) r.push(chave(a, b));
+    return r;
+  };
+  const concluir = (refazer, a, b) => (refazer.includes(chave(a, b)) ? refazer.filter((k) => k !== chave(a, b)) : refazer);
 
   // pontos totais ganhos nos duelos feitos (só serve de desempate e para mostrar)
   const pontos = (res, ids) => {
@@ -179,7 +187,7 @@ const TierDuelos = (() => {
 
   // o que vem do armazenamento: só chaves bem formadas (ids por ordem alfabética) e valores que fazem sentido no par
   const normalizar = (raw) => {
-    const r = { v: VERSAO, res: {} };
+    const r = { v: VERSAO, res: {}, refazer: [] };
     if (!raw || typeof raw !== "object" || raw.v !== VERSAO || !raw.res || typeof raw.res !== "object") return r;
     for (const k of Object.keys(raw.res)) {
       const m = /^(tt\d+)\|(tt\d+)$/.exec(k);
@@ -187,10 +195,12 @@ const TierDuelos = (() => {
       const v = limpar(raw.res[k], m[1], m[2]);
       if (v) r.res[k] = v;
     }
+    const ref = raw.refazer;
+    if (Array.isArray(ref)) for (const k of ref) if (typeof k === "string" && Object.prototype.hasOwnProperty.call(r.res, k) && !r.refazer.includes(k)) r.refazer.push(k);
     return r;
   };
 
-  return { CATEGORIAS, TOTAL, chave, pares, ordemDosPares, registar, avaliar, remover, juntar, pendentes, progresso, pontos, ordenar, normalizar };
+  return { CATEGORIAS, TOTAL, chave, pares, ordemDosPares, registar, avaliar, remover, juntar, pendentes, progresso, marcarRefazer, concluir, pontos, ordenar, normalizar };
 })();
 
 if (typeof module !== "undefined") module.exports = TierDuelos;
