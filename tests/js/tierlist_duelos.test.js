@@ -51,8 +51,8 @@ test("registar guarda o vencedor, é imutável e recusa vencedores inválidos", 
   const r0 = {};
   const r1 = D.registar(r0, "tt1", "tt2", "tt2");
   assert.deepEqual(r0, {});
-  assert.equal(r1["tt1|tt2"], "tt2");
-  assert.equal(D.registar(r1, "tt2", "tt1", "tt1")["tt1|tt2"], "tt1"); // refazer um duelo substitui
+  assert.deepEqual(r1["tt1|tt2"], { geral: "tt2" });
+  assert.deepEqual(D.registar(r1, "tt2", "tt1", "tt1")["tt1|tt2"], { geral: "tt1" }); // refazer um duelo substitui
   assert.equal(D.registar(r1, "tt1", "tt2", "=") === D.registar(r1, "tt1", "tt2", "="), false); // cada registo cria um objeto novo
   assert.equal(D.registar(r1, "tt1", "tt2", "tt9"), r1);
   assert.equal(D.registar(r1, "tt1", "tt1", "tt1"), r1);
@@ -72,10 +72,83 @@ test("pendentes e progresso contam só os pares do conjunto", () => {
   assert.deepEqual(D.progresso(r, conj), { feitos: 1, total: 3 });
 });
 
-test("vitorias: vitória vale 2, empate 1 (meios-pontos em inteiros)", () => {
+test("pontos: soma dos pontos ganhos (Melhor filme só: 5,5 para o vencedor, 2,5 para o outro; empate 4 e 4)", () => {
   let r = D.registar({}, "tt1", "tt2", "tt1");
   r = D.registar(r, "tt1", "tt3", "=");
-  assert.deepEqual(D.vitorias(r, ids(3)), { tt1: 3, tt2: 0, tt3: 1 });
+  assert.deepEqual(D.pontos(r, ids(3)), { tt1: 9.5, tt2: 2.5, tt3: 4 });
+});
+
+test("categorias: cinco, pesos 3/2/1/1/1 com total 8, 'geral' primeiro", () => {
+  assert.deepEqual(D.CATEGORIAS.map((c) => [c.id, c.nome, c.peso]), [
+    ["geral", "Melhor filme", 3], ["opiniao", "Opinião pessoal", 2], ["plot", "Plot", 1], ["acting", "Acting", 1], ["cinema", "Cinematografia", 1]]);
+  assert.equal(D.TOTAL, 8);
+});
+
+test("avaliar: o exemplo do desenho (A ganha geral+plot+acting, B ganha opinião+cinema) dá A com 6 contra 2 e margem 4", () => {
+  const r = D.registar({}, "tt1", "tt2", { geral: "tt1", opiniao: "tt2", plot: "tt1", acting: "tt1", cinema: "tt2" });
+  const x = D.avaliar(r, "tt2", "tt1"); // a ordem dos argumentos não conta
+  assert.equal(x.vencedor, "tt1");
+  assert.equal(x.pontos.tt1, 5);
+  assert.equal(x.pontos.tt2, 3);
+  assert.equal(x.margem, 2);
+});
+
+test("avaliar: só 'geral' dá margem 3; categorias em falta contam como empate; empate total dá margem 0", () => {
+  const r = D.registar({}, "tt1", "tt2", { geral: "tt2" });
+  const x = D.avaliar(r, "tt1", "tt2");
+  assert.deepEqual([x.vencedor, x.margem, x.pontos.tt2, x.pontos.tt1], ["tt2", 3, 5.5, 2.5]);
+  assert.equal(D.avaliar(D.registar({}, "tt1", "tt2", { geral: "=" }), "tt1", "tt2").margem, 0);
+  assert.equal(D.avaliar(D.registar({}, "tt1", "tt2", { geral: "=" }), "tt1", "tt2").vencedor, "=");
+  assert.equal(D.avaliar({}, "tt1", "tt2"), null);
+});
+
+test("avaliar: o Melhor filme não chega para ganhar se o resto pesar mais (1 contra 4)", () => {
+  const r = D.registar({}, "tt1", "tt2", { geral: "tt1", opiniao: "tt2", plot: "tt2", acting: "tt2", cinema: "tt2" });
+  const x = D.avaliar(r, "tt1", "tt2");
+  assert.equal(x.vencedor, "tt2");
+  assert.equal(x.margem, 2);
+});
+
+test("avaliar aceita o formato antigo (string) como {geral: vencedor}", () => {
+  const x = D.avaliar({ "tt1|tt2": "tt1" }, "tt1", "tt2");
+  assert.deepEqual([x.vencedor, x.margem], ["tt1", 3]);
+  assert.equal(D.avaliar({ "tt1|tt2": "=" }, "tt1", "tt2").margem, 0);
+});
+
+test("registar com categorias: exige 'geral' válido, ignora categorias desconhecidas ou inválidas", () => {
+  const r0 = {};
+  assert.equal(D.registar(r0, "tt1", "tt2", { opiniao: "tt1" }), r0); // sem geral
+  assert.equal(D.registar(r0, "tt1", "tt2", { geral: "tt9" }), r0);
+  const r = D.registar(r0, "tt1", "tt2", { geral: "tt1", plot: "tt9", acting: "=", extra: "tt1", cinema: "tt2" });
+  assert.deepEqual(r["tt1|tt2"], { geral: "tt1", acting: "=", cinema: "tt2" });
+});
+
+test("ordenar: uma contradição de margem pequena é preferida a uma de margem grande", () => {
+  // ciclo tt1 > tt2 > tt3 > tt1; tt3 ganha a tt1 por pouco (margem 1), os outros claramente (margem 8)
+  let r = D.registar({}, "tt1", "tt2", { geral: "tt1", opiniao: "tt1", plot: "tt1", acting: "tt1", cinema: "tt1" }); // margem 8
+  r = D.registar(r, "tt2", "tt3", { geral: "tt2", opiniao: "tt2", plot: "tt2", acting: "tt2", cinema: "tt2" });     // margem 8
+  r = D.registar(r, "tt1", "tt3", { geral: "tt3", opiniao: "tt1" });                                              // tt3 ganha por 1 (4,5 contra 3,5)
+  const o = D.ordenar(r, ids(3));
+  assert.deepEqual(o.ordem, ["tt1", "tt2", "tt3"]); // viola o duelo apertado, não os dois claros
+  assert.equal(o.contradicoes.length, 1);
+  assert.deepEqual([o.contradicoes[0].vencedor, o.contradicoes[0].perdedor], ["tt3", "tt1"]);
+  assert.ok(o.contradicoes[0].margem > 0 && o.contradicoes[0].margem < 8);
+});
+
+test("ordenar: as contradições vêm por margem decrescente", () => {
+  let r = D.registar({}, "tt1", "tt2", { geral: "tt2" });                                                          // tt2 por 3
+  r = D.registar(r, "tt3", "tt4", { geral: "tt4", opiniao: "tt4", plot: "tt4", acting: "tt4", cinema: "tt4" });    // tt4 por 8
+  r = D.registar(r, "tt1", "tt3", { geral: "tt1", opiniao: "tt1", plot: "tt1", acting: "tt1", cinema: "tt1" });
+  r = D.registar(r, "tt2", "tt4", { geral: "tt2", opiniao: "tt2", plot: "tt2", acting: "tt2", cinema: "tt2" });
+  // tt1>tt3, tt4>tt3, tt2>tt4, tt2>tt1: sem ciclos, logo nenhuma contradição
+  assert.deepEqual(D.ordenar(r, ids(4)).contradicoes, []);
+  // com ciclo: tt1>tt2>tt3>tt1, margens 8, 3 e 5: a menor (3) é a violada
+  let c = D.registar({}, "tt1", "tt2", { geral: "tt1", opiniao: "tt1", plot: "tt1", acting: "tt1", cinema: "tt1" });
+  c = D.registar(c, "tt2", "tt3", { geral: "tt2" });
+  c = D.registar(c, "tt1", "tt3", { geral: "tt3", opiniao: "tt3", plot: "tt3", acting: "tt3" });
+  const o = D.ordenar(c, ids(3));
+  assert.equal(o.contradicoes.length, 1);
+  assert.equal(o.contradicoes[0].margem, 3);
 });
 
 test("ordenar: com resultados consistentes devolve a ordem verdadeira, sem contradições", () => {
@@ -117,15 +190,23 @@ test("ordenar é ótimo: iguala o mínimo de contradições da força bruta (n=6
   for (const semente of [1, 2, 3, 4, 5, 6]) {
     const al = rng(semente);
     let r = {};
-    for (const [a, b] of D.pares(conj)) r = D.registar(r, a, b, al() < 0.5 ? a : b);
+    const qual = () => { const q = al(); return q < 0.45 ? a_ : q < 0.9 ? b_ : "="; };
+    let a_, b_;
+    for (const [a, b] of D.pares(conj)) {
+      a_ = a; b_ = b;
+      r = D.registar(r, a, b, { geral: qual(), opiniao: qual(), plot: qual(), acting: qual(), cinema: qual() });
+    }
     const custo = (ordem) => {
       let c = 0;
-      for (let i = 0; i < ordem.length; i++) for (let j = i + 1; j < ordem.length; j++) if (r[D.chave(ordem[i], ordem[j])] === ordem[j]) c++;
+      for (let i = 0; i < ordem.length; i++) for (let j = i + 1; j < ordem.length; j++) {
+        const x = D.avaliar(r, ordem[i], ordem[j]);
+        if (x.vencedor === ordem[j]) c += x.margem;
+      }
       return c;
     };
     const melhor = Math.min(...permutacoes(conj).map(custo));
     const o = D.ordenar(r, conj);
-    assert.equal(o.contradicoes.length, melhor, `semente ${semente}`);
+    assert.equal(o.contradicoes.reduce((s, c) => s + c.margem, 0), melhor, `semente ${semente}`);
     assert.equal(custo(o.ordem), melhor);
   }
 });
@@ -159,7 +240,10 @@ test("normalizar higieniza o que vem do armazenamento", () => {
     "lixo":"x", "tt7|tt8":42, "tt10|tt9":"tt10"}}`);
   const r = D.normalizar(sujo);
   assert.deepEqual(Object.keys(r.res).sort(), ["tt10|tt9", "tt1|tt2", "tt2|tt3"]);
+  assert.deepEqual(r.res["tt1|tt2"], { geral: "tt2" }); // formato antigo vira {geral}
   assert.equal(Object.getPrototypeOf(r.res), Object.prototype);
+  const novo = D.normalizar({ v: 1, res: { "tt1|tt2": { geral: "tt1", plot: "tt2", acting: "tt9", opiniao: 3 }, "tt3|tt4": { plot: "tt3" }, "tt5|tt6": [] } });
+  assert.deepEqual(novo.res, { "tt1|tt2": { geral: "tt1", plot: "tt2" } });
   assert.deepEqual(D.normalizar(null), { v: 1, res: {} });
   assert.deepEqual(D.normalizar({ v: 2, res: { "tt1|tt2": "tt1" } }), { v: 1, res: {} });
 });
@@ -169,7 +253,7 @@ test("juntar: une os resultados e, no mesmo par, vale o segundo; não muta nenhu
   const b = D.registar(D.registar({}, "tt1", "tt2", "tt2"), "tt2", "tt3", "=");
   const antesA = JSON.stringify(a), antesB = JSON.stringify(b);
   const j = D.juntar(a, b);
-  assert.deepEqual(j, { "tt1|tt2": "tt2", "tt1|tt3": "tt3", "tt2|tt3": "=" });
+  assert.deepEqual(j, { "tt1|tt2": { geral: "tt2" }, "tt1|tt3": { geral: "tt3" }, "tt2|tt3": { geral: "=" } });
   assert.equal(JSON.stringify(a), antesA);
   assert.equal(JSON.stringify(b), antesB);
 });
@@ -180,4 +264,15 @@ test("juntar com um dos lados vazio devolve o outro e aguenta valores em falta",
   assert.deepEqual(D.juntar({}, a), a);
   assert.deepEqual(D.juntar(undefined, a), a);
   assert.deepEqual(D.juntar(a, null), a);
+});
+
+test("desempenho: 18 filmes com duelos por categorias ordenam-se em tempo útil", () => {
+  const conj = ids(18);
+  const al = rng(5);
+  let r = {};
+  for (const [a, b] of D.pares(conj)) r = D.registar(r, a, b, { geral: al() < 0.5 ? a : b, opiniao: al() < 0.5 ? a : b, plot: "=", acting: al() < 0.5 ? a : b });
+  const t0 = Date.now();
+  const o = D.ordenar(r, conj);
+  assert.equal(o.ordem.length, 18);
+  assert.ok(Date.now() - t0 < 5000, `demorou ${Date.now() - t0} ms`);
 });

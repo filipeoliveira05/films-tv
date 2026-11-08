@@ -618,6 +618,14 @@ body.tl-sem-scroll { overflow: hidden; }
 .tl-dl-card img { display: block; width: 100%; aspect-ratio: 2 / 3; object-fit: cover; border-radius: 4px; pointer-events: none; -webkit-user-drag: none; }
 .tl-dl-card .tl-sem { display: grid; place-items: center; aspect-ratio: 2 / 3; font-size: 1rem; text-align: center; }
 .tl-dl-titulo { font-weight: 600; line-height: 1.2; overflow-wrap: anywhere; }
+.tl-dl-card.tl-on { border-color: var(--ink); background: rgba(255, 255, 255, 0.18); }
+.tl-dl-cats { margin-top: 0.9rem; }
+.tl-dl-cat { display: flex; align-items: center; justify-content: space-between; gap: 0.6rem; padding: 0.3rem 0; border-bottom: 1px solid var(--line); }
+.tl-dl-cat-nome { font-weight: 600; }
+.tl-dl-ops { display: flex; gap: 0.3rem; }
+.tl-dl-op { min-width: 2.8rem; min-height: 2.5rem; font: inherit; color: var(--ink); background: rgba(255, 255, 255, 0.08); border: 1px solid var(--line); border-radius: 6px; cursor: pointer; }
+.tl-dl-op.tl-on { color: var(--deep); background: var(--ink); border-color: var(--ink); }
+.tl-dl-resumo { margin-top: 0.7rem; color: var(--dim); font-variant-numeric: tabular-nums; }
 .tl-dl-acoes { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 1rem; }
 
 .tl-dl-aviso { margin: 0 0 1rem; padding: 0.6rem 0.8rem; background: rgba(255, 255, 255, 0.08); border-left: 3px solid var(--dim); }

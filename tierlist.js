@@ -359,7 +359,7 @@
   const mostrarMenu = () => {
     dl = null;
     $("#tl-duelos-titulo").textContent = "Duelos";
-    const nos = [el("p", "tl-dl-intro", "Escolhe um tier: duelas os filmes dele dois a dois e no fim vês a ordem que contradiz menos respostas.")];
+    const nos = [el("p", "tl-dl-intro", "Escolhe um tier: duelas os filmes dele dois a dois, por categorias (só o Melhor filme é obrigatório), e no fim vês a ordem que contradiz menos respostas.")];
     if (!duelosGuardavel) nos.push(el("p", "tl-aviso", "Sem armazenamento neste browser: o progresso perde-se ao sair."));
     estado.tiers.forEach((t) => {
       const ids = T.listar(estado, t.id);
@@ -387,20 +387,63 @@
     trilho.append(enche);
     barra.append(trilho);
     const par = el("div", "tl-dl-par");
-    (Math.random() < 0.5 ? [a, b] : [b, a]).forEach((id) => { // lado aleatório, para não viciar a escolha
+    dl.lado = Math.random() < 0.5 ? [a, b] : [b, a]; // lado aleatório, para não viciar a escolha
+    dl.escolha = { geral: null };
+    dl.lado.forEach((id) => { // tocar num poster escolhe-o como Melhor filme (o atalho do caso comum)
       const c = botao("tl-dl-card");
       c.dataset.film = id;
       c.append(imagemDe(estado.filmes[id]), el("span", "tl-dl-titulo", nomeDe(id)));
       par.append(c);
     });
+    const cats = el("div", "tl-dl-cats");
+    DU.CATEGORIAS.forEach((c) => {
+      const linha = el("div", "tl-dl-cat");
+      linha.dataset.cat = c.id;
+      linha.append(el("span", "tl-dl-cat-nome", `${c.nome} ${c.peso}`));
+      const ops = el("div", "tl-dl-ops");
+      [[dl.lado[0], "◀", "esquerda"], ["=", "=", "empate"], [dl.lado[1], "▶", "direita"]].forEach(([val, txt, rotulo]) => {
+        const o = botao("tl-dl-op", txt);
+        o.dataset.cat = c.id;
+        o.dataset.val = val;
+        o.setAttribute("aria-label", `${c.nome}: ${rotulo}`);
+        ops.append(o);
+      });
+      linha.append(ops);
+      cats.append(linha);
+    });
+    const resumo = el("div", "tl-dl-resumo");
+    resumo.id = "tl-dl-resumo";
     const acoes = el("div", "tl-dl-acoes");
-    const empate = botao("tl-btn", "Empate / não sei");
-    empate.id = "tl-dl-empate";
+    const confirmar = botao("tl-btn tl-btn-forte", "Confirmar");
+    confirmar.id = "tl-dl-confirmar";
     const desfazer = botao("tl-btn", "Desfazer");
     desfazer.id = "tl-dl-desfazer";
     desfazer.disabled = dl.historico.length === 0;
-    acoes.append(empate, desfazer);
-    mostrar(barra, par, acoes);
+    acoes.append(confirmar, desfazer);
+    mostrar(barra, par, cats, resumo, acoes);
+    pintarEscolha();
+  };
+
+  // reflete dl.escolha no ecrã: botões ativos, pontuação em direto e Confirmar (só com Melhor filme escolhido)
+  const pintarEscolha = () => {
+    const e = dl.escolha;
+    corpo.querySelectorAll(".tl-dl-op").forEach((o) => {
+      const val = o.dataset.cat === "geral" ? e.geral : (e[o.dataset.cat] ?? "=");
+      o.classList.toggle("tl-on", o.dataset.val === val);
+      o.setAttribute("aria-pressed", String(o.dataset.val === val));
+    });
+    corpo.querySelectorAll(".tl-dl-card").forEach((c) => c.classList.toggle("tl-on", c.dataset.film === e.geral));
+    const [x, y] = dl.lado;
+    const resumo = $("#tl-dl-resumo");
+    const confirmar = $("#tl-dl-confirmar");
+    confirmar.disabled = e.geral === null;
+    if (e.geral === null) {
+      resumo.textContent = "Escolhe primeiro o Melhor filme.";
+      return;
+    }
+    const v = DU.avaliar(DU.registar({}, x, y, e), x, y);
+    const f = (n) => String(n).replace(".", ",");
+    resumo.textContent = `◀ ${f(v.pontos[x])} – ${f(v.pontos[y])} ▶ · ${v.vencedor === "=" ? "empate" : v.vencedor === x ? "ganha o da esquerda" : "ganha o da direita"}`;
   };
 
   const mostrarOrdem = () => {
@@ -410,9 +453,9 @@
     const envolvidos = new Set(o.contradicoes.flatMap((c) => [c.vencedor, c.perdedor]));
     if (o.contradicoes.length) {
       const aviso = el("div", "tl-dl-aviso");
-      aviso.append(el("p", "", `${o.contradicoes.length} ${o.contradicoes.length === 1 ? "contradição" : "contradições"}: respostas em que o filme que ganhou ficou abaixo do que perdeu.`));
+      aviso.append(el("p", "", `${o.contradicoes.length} ${o.contradicoes.length === 1 ? "contradição" : "contradições"}: respostas em que o filme que ganhou ficou abaixo do que perdeu. As de maior margem primeiro.`));
       const ul = el("ul");
-      o.contradicoes.forEach((c) => ul.append(el("li", "", `${estado.filmes[c.vencedor].titulo} ganhou a ${estado.filmes[c.perdedor].titulo}`)));
+      o.contradicoes.forEach((c) => ul.append(el("li", "", `${estado.filmes[c.vencedor].titulo} ganhou a ${estado.filmes[c.perdedor].titulo} (margem ${String(c.margem).replace(".", ",")})`)));
       aviso.append(ul);
       nos.push(aviso);
     }
@@ -422,7 +465,7 @@
       li.dataset.film = id;
       const mini = el("span", "tl-dl-mini");
       mini.append(imagemDe(estado.filmes[id]));
-      li.append(mini, el("span", "tl-dl-titulo", nomeDe(id)), el("span", "tl-dl-pontos", `${o.vitorias[id] / 2} vit.`));
+      li.append(mini, el("span", "tl-dl-titulo", nomeDe(id)), el("span", "tl-dl-pontos", `${String(o.pontos[id]).replace(".", ",")} pts`));
       ol.append(li);
     });
     nos.push(ol);
@@ -450,10 +493,10 @@
     return fila.length ? mostrarDuelo() : mostrarOrdem();
   };
 
-  const responderDuelo = (vencedor) => {
+  const responderDuelo = (escolha) => {
     const [a, b] = dl.fila.shift();
     dl.historico.push({ a, b, anterior: duelos.res[DU.chave(a, b)] });
-    duelos = { ...duelos, res: DU.registar(duelos.res, a, b, vencedor) };
+    duelos = { ...duelos, res: DU.registar(duelos.res, a, b, escolha) };
     gravarDuelos();
     dl.feitos += 1;
     return dl.fila.length ? mostrarDuelo() : mostrarOrdem();
@@ -499,8 +542,9 @@
     const alvo = e.target.closest("button");
     if (!alvo || !dl && !alvo.matches(".tl-dl-tier")) return;
     if (alvo.matches(".tl-dl-tier")) return comecar(alvo.dataset.tier);
-    if (alvo.matches(".tl-dl-card")) return responderDuelo(alvo.dataset.film);
-    if (alvo.id === "tl-dl-empate") return responderDuelo("=");
+    if (alvo.matches(".tl-dl-card")) { dl.escolha.geral = alvo.dataset.film; return pintarEscolha(); }
+    if (alvo.matches(".tl-dl-op")) { dl.escolha[alvo.dataset.cat] = alvo.dataset.val; return pintarEscolha(); }
+    if (alvo.id === "tl-dl-confirmar") return dl.escolha.geral === null ? undefined : responderDuelo({ ...dl.escolha });
     if (alvo.id === "tl-dl-desfazer") return desfazerDuelo();
     if (alvo.id === "tl-dl-rever") return reverConflitos();
     if (alvo.id === "tl-dl-voltar") return mostrarMenu();
