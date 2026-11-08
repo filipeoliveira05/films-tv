@@ -405,6 +405,42 @@ r = duelos("""
 if r:
     R.ok("todos empatados: sem aviso e 4 filmes na ordem", r["r"]["av"] is None and len(r["r"]["ordem"]) == 4 and r["r"]["n"] == 6, str(r["r"]))
 
+# ---- S21: categorias do duelo (Confirmar só com Melhor filme, pontuação em direto, guardado por categoria)
+r = duelos("""
+  await abrirTier();
+  const [x, y] = cartas();   // x à esquerda, y à direita
+  const op = (cat, val) => $(D + ' .tl-dl-op[data-cat="' + cat + '"][data-val="' + val + '"]');
+  const antes = { confirmar: $('#tl-dl-confirmar').disabled, resumo: $('#tl-dl-resumo').textContent, nomes: $$(D + ' .tl-dl-cat-nome').map((e) => e.textContent) };
+  await click(op('opiniao', y)); await click(op('plot', x));        // sem Melhor filme: continua bloqueado
+  const bloqueado = $('#tl-dl-confirmar').disabled;
+  await click(op('geral', x));
+  const resumo = $('#tl-dl-resumo').textContent;
+  const ativos = $$(D + ' .tl-dl-op.tl-on').map((o) => o.dataset.cat + ':' + (o.dataset.val === x ? 'x' : o.dataset.val === y ? 'y' : '='));
+  await click($('#tl-dl-confirmar'));
+  const guardado = JSON.parse(localStorage.getItem('filmes-tv:duelos')).res;
+  return { antes, bloqueado, resumo, ativos, guardado: Object.values(guardado)[0], x, y, proximo: $(D + ' .tl-dl-barra').textContent };""", titulo="S21  categorias do duelo")
+if r:
+    x = r["r"]
+    R.ok("Confirmar bloqueado sem Melhor filme; categorias com os nomes e pesos pedidos",
+         x["antes"]["confirmar"] and x["bloqueado"] and x["antes"]["nomes"] == ["Melhor filme 3", "Opinião pessoal 2", "Plot 1", "Acting 1", "Cinematografia 1"], str(x["antes"]))
+    # x ganha geral (3) e plot (1); y ganha opinião (2); acting e cinema empatam (1 cada): x = 4+1 = 5, y = 2+1 = 3
+    R.ok("pontuação em direto: 5 – 3 (esquerda ganha)", x["resumo"].startswith("◀ 5 – 3 ▶") and "esquerda" in x["resumo"], x["resumo"])
+    R.ok("botões ativos refletem a escolha", sorted(x["ativos"]) == sorted(["geral:x", "opiniao:y", "plot:x", "acting:=", "cinema:="]), str(x["ativos"]))
+    g = x["guardado"]
+    R.ok("guardado por categoria (acting/cinema em falta = empate)", g == {"geral": x["x"], "opiniao": x["y"], "plot": x["x"]}, str(g))
+    R.ok("passa ao duelo seguinte", "Duelo 2" in x["proximo"], x["proximo"])
+
+# ---- S22: duelos antigos (valor = vencedor) continuam a valer
+r = duelos("""
+  const [a, b] = ids.slice(0, 2).sort();
+  localStorage.setItem('filmes-tv:duelos', JSON.stringify({ v: 1, res: { [a + '|' + b]: a } }));
+  await click($('#tl-duelos-sair'));
+  return {};""", titulo="S22  duelo antigo continua a contar", fase2="""
+  await click($('#tl-duelos'));
+  return { t1: $('#tl-duelos-corpo .tl-dl-tier[data-tier="t1"]').textContent };""")
+if r:
+    R.ok("um duelo no formato antigo conta como feito (1/6)", "1/6" in r["r"]["t1"], str(r["r"]))
+
 # ---- S20: o progresso dos duelos vai no Exportar e volta com o Importar (sem apagar os que já existem)
 PEGAR = """
 let descarregado = null;
