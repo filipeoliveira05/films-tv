@@ -631,14 +631,17 @@ body.tl-sem-scroll { overflow: hidden; }
 .tl-dl-cat-nome { grid-area: nome; font-weight: 600; text-align: center; }
 /* ecrã largo: o nome da categoria vai para o meio, ao lado do "=", e o poster encolhe até tudo caber sem scroll */
 @media (min-width: 700px) {
-  .tl-dl-grelha { grid-template-columns: 1fr 16.1rem 1fr; }
-  .tl-dl-cat { grid-template-columns: 1fr 13rem 2.6rem 1fr; grid-template-areas: "esq nome igual dir"; align-items: center; margin-top: 0; }
+  .tl-dl-grelha { grid-template-columns: 1fr 13rem 1fr; }
+  .tl-dl-cat { grid-template-columns: 1fr 13rem 1fr; grid-template-areas: "esq nome dir" "esq igual dir"; gap: 0.1rem 0.5rem; align-items: center; justify-items: center; margin-top: 0; }
+  .tl-dl-cat .tl-dl-op:not(.tl-dl-op-igual) { align-self: stretch; justify-self: stretch; }
+  .tl-dl-cat-nome { font-size: 0.85rem; line-height: 1.1; }
+  .tl-dl-cat .tl-dl-op-igual { width: 2.6rem; min-height: 1.7rem; }
   .tl-dl-op { min-height: 2.3rem; }
   .tl-dl-vazio { display: none; }
   .tl-dl-grelha .tl-dl-centro { grid-column: 2; grid-row: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.6rem; }
   .tl-dl-centro .tl-dl-resumo, .tl-dl-centro .tl-dl-acoes { margin: 0; }
   .tl-dl-centro .tl-dl-acoes { flex-direction: column; align-items: stretch; width: 100%; }
-  .tl-dl-card img, .tl-dl-card .tl-sem { width: auto; max-width: 100%; height: max(9rem, calc(100dvh - 31rem)); margin: 0 auto; }
+  .tl-dl-card img, .tl-dl-card .tl-sem { width: auto; max-width: 100%; height: max(7rem, calc(100dvh - 32rem)); margin: 0 auto; }
 }
 .tl-dl-op { min-height: 2.6rem; font: inherit; color: var(--dim); background: rgba(255, 255, 255, 0.08); border: 1px solid var(--line); border-radius: 6px; cursor: pointer; }
 .tl-dl-op-igual { padding: 0; }
