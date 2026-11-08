@@ -626,10 +626,24 @@ body.tl-sem-scroll { overflow: hidden; }
 .tl-dl-total.tl-lider { color: var(--ink); }
 .tl-dl-meio { align-self: center; text-align: center; }
 .tl-dl-pts { font-size: 0.7rem; color: var(--dim); text-transform: uppercase; letter-spacing: 0.05em; }
-.tl-dl-cat-nome { grid-column: 1 / -1; margin-top: 0.5rem; font-weight: 600; text-align: center; }
+/* cada categoria é uma linha com as mesmas colunas da grelha, por isso os botões ficam por baixo do poster certo */
+.tl-dl-cat { grid-column: 1 / -1; display: grid; grid-template-columns: 1fr 2.6rem 1fr; grid-template-areas: "nome nome nome" "esq igual dir"; gap: 0.2rem 0.5rem; margin-top: 0.3rem; }
+.tl-dl-cat-nome { grid-area: nome; font-weight: 600; text-align: center; }
+/* ecrã largo: o nome da categoria vai para o meio, ao lado do "=", e o poster encolhe até tudo caber sem scroll */
+@media (min-width: 700px) {
+  .tl-dl-grelha { grid-template-columns: 1fr 16.1rem 1fr; }
+  .tl-dl-cat { grid-template-columns: 1fr 13rem 2.6rem 1fr; grid-template-areas: "esq nome igual dir"; align-items: center; margin-top: 0; }
+  .tl-dl-op { min-height: 2.3rem; }
+  .tl-dl-vazio { display: none; }
+  .tl-dl-grelha .tl-dl-centro { grid-column: 2; grid-row: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.6rem; }
+  .tl-dl-centro .tl-dl-resumo, .tl-dl-centro .tl-dl-acoes { margin: 0; }
+  .tl-dl-centro .tl-dl-acoes { flex-direction: column; align-items: stretch; width: 100%; }
+  .tl-dl-card img, .tl-dl-card .tl-sem { width: auto; max-width: 100%; height: max(9rem, calc(100dvh - 31rem)); margin: 0 auto; }
+}
 .tl-dl-op { min-height: 2.6rem; font: inherit; color: var(--dim); background: rgba(255, 255, 255, 0.08); border: 1px solid var(--line); border-radius: 6px; cursor: pointer; }
 .tl-dl-op-igual { padding: 0; }
 .tl-dl-op.tl-on { color: var(--deep); background: var(--ink); border-color: var(--ink); font-weight: 800; }
+.tl-dl-centro { grid-column: 1 / -1; }
 .tl-dl-resumo { min-height: 1.2rem; margin-top: 0.7rem; color: var(--dim); text-align: center; }
 .tl-dl-acoes { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 1rem; }
 

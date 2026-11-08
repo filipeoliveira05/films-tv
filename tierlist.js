@@ -409,19 +409,22 @@
       t.dataset.film = id;
       return t;
     };
-    grelha.append(poster(esq), el("span", "tl-dl-meio"), poster(dir));
+    grelha.append(poster(esq), el("span", "tl-dl-meio tl-dl-vazio"), poster(dir));
     grelha.append(total(esq), el("span", "tl-dl-meio tl-dl-pts", "pontos"), total(dir));
     DU.CATEGORIAS.forEach((c) => {
+      const linha = el("div", "tl-dl-cat");
       const nome = el("div", "tl-dl-cat-nome", `${c.nome} (${c.peso})`);
       nome.dataset.cat = c.id;
-      grelha.append(nome);
-      [[esq, "esquerda"], ["=", "empate"], [dir, "direita"]].forEach(([val, rotulo]) => {
+      linha.append(nome);
+      [[esq, "esq", "esquerda"], ["=", "igual", "empate"], [dir, "dir", "direita"]].forEach(([val, area, rotulo]) => {
         const o = botao(val === "=" ? "tl-dl-op tl-dl-op-igual" : "tl-dl-op", val === "=" ? "=" : "✓");
         o.dataset.cat = c.id;
         o.dataset.val = val;
+        o.style.gridArea = area;
         o.setAttribute("aria-label", `${c.nome}: ${rotulo}`);
-        grelha.append(o);
+        linha.append(o);
       });
+      grelha.append(linha);
     });
     const resumo = el("div", "tl-dl-resumo");
     resumo.id = "tl-dl-resumo";
@@ -432,7 +435,10 @@
     desfazer.id = "tl-dl-desfazer";
     desfazer.disabled = dl.historico.length === 0;
     acoes.append(confirmar, desfazer);
-    mostrar(barra, grelha, resumo, acoes);
+    const centro = el("div", "tl-dl-centro"); // no ecrã largo ocupa o espaço vazio entre os dois posters
+    centro.append(resumo, acoes);
+    grelha.append(centro);
+    mostrar(barra, grelha);
     pintarEscolha();
   };
 
