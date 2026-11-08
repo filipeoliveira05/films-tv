@@ -386,30 +386,35 @@
     enche.style.width = `${(dl.feitos / dl.total) * 100}%`;
     trilho.append(enche);
     barra.append(trilho);
-    const par = el("div", "tl-dl-par");
+    // uma só grelha de 3 colunas (filme | meio | filme): os botões de cada categoria ficam por baixo do filme a que dizem respeito
+    const grelha = el("div", "tl-dl-grelha");
     dl.lado = Math.random() < 0.5 ? [a, b] : [b, a]; // lado aleatório, para não viciar a escolha
     dl.escolha = { geral: null };
-    dl.lado.forEach((id) => { // tocar num poster escolhe-o como Melhor filme (o atalho do caso comum)
+    const [esq, dir] = dl.lado;
+    const poster = (id) => { // tocar num poster escolhe-o como Melhor filme (o atalho do caso comum)
       const c = botao("tl-dl-card");
       c.dataset.film = id;
       c.append(imagemDe(estado.filmes[id]), el("span", "tl-dl-titulo", nomeDe(id)));
-      par.append(c);
-    });
-    const cats = el("div", "tl-dl-cats");
+      return c;
+    };
+    const total = (id) => {
+      const t = el("div", "tl-dl-total", "–");
+      t.dataset.film = id;
+      return t;
+    };
+    grelha.append(poster(esq), el("span", "tl-dl-meio"), poster(dir));
+    grelha.append(total(esq), el("span", "tl-dl-meio tl-dl-pts", "pontos"), total(dir));
     DU.CATEGORIAS.forEach((c) => {
-      const linha = el("div", "tl-dl-cat");
-      linha.dataset.cat = c.id;
-      linha.append(el("span", "tl-dl-cat-nome", `${c.nome} ${c.peso}`));
-      const ops = el("div", "tl-dl-ops");
-      [[dl.lado[0], "◀", "esquerda"], ["=", "=", "empate"], [dl.lado[1], "▶", "direita"]].forEach(([val, txt, rotulo]) => {
-        const o = botao("tl-dl-op", txt);
+      const nome = el("div", "tl-dl-cat-nome", `${c.nome} (${c.peso})`);
+      nome.dataset.cat = c.id;
+      grelha.append(nome);
+      [[esq, "esquerda"], ["=", "empate"], [dir, "direita"]].forEach(([val, rotulo]) => {
+        const o = botao(val === "=" ? "tl-dl-op tl-dl-op-igual" : "tl-dl-op", val === "=" ? "=" : "✓");
         o.dataset.cat = c.id;
         o.dataset.val = val;
         o.setAttribute("aria-label", `${c.nome}: ${rotulo}`);
-        ops.append(o);
+        grelha.append(o);
       });
-      linha.append(ops);
-      cats.append(linha);
     });
     const resumo = el("div", "tl-dl-resumo");
     resumo.id = "tl-dl-resumo";
@@ -420,11 +425,11 @@
     desfazer.id = "tl-dl-desfazer";
     desfazer.disabled = dl.historico.length === 0;
     acoes.append(confirmar, desfazer);
-    mostrar(barra, par, cats, resumo, acoes);
+    mostrar(barra, grelha, resumo, acoes);
     pintarEscolha();
   };
 
-  // reflete dl.escolha no ecrã: botões ativos, pontuação em direto e Confirmar (só com Melhor filme escolhido)
+  // reflete dl.escolha no ecrã: botões ativos, total de cada filme e Confirmar (só com Melhor filme escolhido)
   const pintarEscolha = () => {
     const e = dl.escolha;
     corpo.querySelectorAll(".tl-dl-op").forEach((o) => {
@@ -434,16 +439,15 @@
     });
     corpo.querySelectorAll(".tl-dl-card").forEach((c) => c.classList.toggle("tl-on", c.dataset.film === e.geral));
     const [x, y] = dl.lado;
-    const resumo = $("#tl-dl-resumo");
     const confirmar = $("#tl-dl-confirmar");
     confirmar.disabled = e.geral === null;
-    if (e.geral === null) {
-      resumo.textContent = "Escolhe primeiro o Melhor filme.";
-      return;
-    }
-    const v = DU.avaliar(DU.registar({}, x, y, e), x, y);
+    $("#tl-dl-resumo").textContent = e.geral === null ? "Escolhe primeiro o Melhor filme." : "";
+    const v = e.geral === null ? null : DU.avaliar(DU.registar({}, x, y, e), x, y);
     const f = (n) => String(n).replace(".", ",");
-    resumo.textContent = `◀ ${f(v.pontos[x])} – ${f(v.pontos[y])} ▶ · ${v.vencedor === "=" ? "empate" : v.vencedor === x ? "ganha o da esquerda" : "ganha o da direita"}`;
+    corpo.querySelectorAll(".tl-dl-total").forEach((t) => {
+      t.textContent = v ? f(v.pontos[t.dataset.film]) : "–";
+      t.classList.toggle("tl-lider", !!v && v.vencedor === t.dataset.film);
+    });
   };
 
   const mostrarOrdem = () => {

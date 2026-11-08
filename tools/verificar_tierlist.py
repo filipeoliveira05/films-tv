@@ -414,17 +414,20 @@ r = duelos("""
   await click(op('opiniao', y)); await click(op('plot', x));        // sem Melhor filme: continua bloqueado
   const bloqueado = $('#tl-dl-confirmar').disabled;
   await click(op('geral', x));
-  const resumo = $('#tl-dl-resumo').textContent;
+  const resumo = $$(D + ' .tl-dl-total').map((t) => t.dataset.film + '=' + t.textContent).join(' ');
   const ativos = $$(D + ' .tl-dl-op.tl-on').map((o) => o.dataset.cat + ':' + (o.dataset.val === x ? 'x' : o.dataset.val === y ? 'y' : '='));
+  const cx = (e) => { const r = e.getBoundingClientRect(); return r.x + r.width / 2; };
+  const alinhado = Math.abs(cx(op('geral', x)) - cx($(D + ' .tl-dl-card[data-film="' + x + '"]'))) < 2 && Math.abs(cx(op('plot', y)) - cx($(D + ' .tl-dl-card[data-film="' + y + '"]'))) < 2;
   await click($('#tl-dl-confirmar'));
   const guardado = JSON.parse(localStorage.getItem('filmes-tv:duelos')).res;
-  return { antes, bloqueado, resumo, ativos, guardado: Object.values(guardado)[0], x, y, proximo: $(D + ' .tl-dl-barra').textContent };""", titulo="S21  categorias do duelo")
+  return { antes, bloqueado, resumo, ativos, alinhado, guardado: Object.values(guardado)[0], x, y, proximo: $(D + ' .tl-dl-barra').textContent };""", titulo="S21  categorias do duelo")
 if r:
     x = r["r"]
     R.ok("Confirmar bloqueado sem Melhor filme; categorias com os nomes e pesos pedidos",
-         x["antes"]["confirmar"] and x["bloqueado"] and x["antes"]["nomes"] == ["Melhor filme 3", "Opinião pessoal 2", "Plot 1", "Acting 1", "Cinematografia 1"], str(x["antes"]))
+         x["antes"]["confirmar"] and x["bloqueado"] and x["antes"]["nomes"] == ["Melhor filme (3)", "Opinião pessoal (2)", "Plot (1)", "Acting (1)", "Cinematografia (1)"], str(x["antes"]))
     # x ganha geral (3) e plot (1); y ganha opinião (2); acting e cinema empatam (1 cada): x = 4+1 = 5, y = 2+1 = 3
-    R.ok("pontuação em direto: 5 – 3 (esquerda ganha)", x["resumo"].startswith("◀ 5 – 3 ▶") and "esquerda" in x["resumo"], x["resumo"])
+    R.ok("total de cada filme em direto: 5 e 3", x["resumo"] == f'{x["x"]}=5 {x["y"]}=3', x["resumo"])
+    R.ok("os botões ficam por baixo do poster do próprio filme (mesma coluna)", x["alinhado"], str(x["alinhado"]))
     R.ok("botões ativos refletem a escolha", sorted(x["ativos"]) == sorted(["geral:x", "opiniao:y", "plot:x", "acting:=", "cinema:="]), str(x["ativos"]))
     g = x["guardado"]
     R.ok("guardado por categoria (acting/cinema em falta = empate)", g == {"geral": x["x"], "opiniao": x["y"], "plot": x["x"]}, str(g))
