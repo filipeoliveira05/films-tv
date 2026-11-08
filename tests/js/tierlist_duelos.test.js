@@ -244,8 +244,8 @@ test("normalizar higieniza o que vem do armazenamento", () => {
   assert.equal(Object.getPrototypeOf(r.res), Object.prototype);
   const novo = D.normalizar({ v: 1, res: { "tt1|tt2": { geral: "tt1", plot: "tt2", acting: "tt9", opiniao: 3 }, "tt3|tt4": { plot: "tt3" }, "tt5|tt6": [] } });
   assert.deepEqual(novo.res, { "tt1|tt2": { geral: "tt1", plot: "tt2" } });
-  assert.deepEqual(D.normalizar(null), { v: 1, res: {} });
-  assert.deepEqual(D.normalizar({ v: 2, res: { "tt1|tt2": "tt1" } }), { v: 1, res: {} });
+  assert.deepEqual(D.normalizar(null), { v: 1, res: {}, refazer: [] });
+  assert.deepEqual(D.normalizar({ v: 2, res: { "tt1|tt2": "tt1" } }), { v: 1, res: {}, refazer: [] });
 });
 
 test("juntar: une os resultados e, no mesmo par, vale o segundo; não muta nenhum", () => {
@@ -275,4 +275,33 @@ test("desempenho: 18 filmes com duelos por categorias ordenam-se em tempo útil"
   const o = D.ordenar(r, conj);
   assert.equal(o.ordem.length, 18);
   assert.ok(Date.now() - t0 < 5000, `demorou ${Date.now() - t0} ms`);
+});
+
+test("refazer: marcarRefazer põe na lista os pares já feitos do conjunto; pendentes e progresso passam a contá-los", () => {
+  let r = D.registar({}, "tt1", "tt2", "tt1");
+  r = D.registar(r, "tt1", "tt3", "tt3");
+  r = D.registar(r, "tt8", "tt9", "tt8"); // de outro conjunto: não entra
+  const conj = ids(3);
+  const antes = [];
+  const ref = D.marcarRefazer(antes, r, conj);
+  assert.deepEqual(antes, []); // imutável
+  assert.deepEqual([...ref].sort(), ["tt1|tt2", "tt1|tt3"]);
+  assert.deepEqual(D.pendentes(r, conj, ref).map(([a, b]) => D.chave(a, b)).sort(), ["tt1|tt2", "tt1|tt3", "tt2|tt3"]);
+  assert.deepEqual(D.progresso(r, conj, ref), { feitos: 0, total: 3 });
+  assert.deepEqual(D.progresso(r, conj), { feitos: 2, total: 3 }); // sem a lista, como antes
+});
+
+test("refazer: concluir tira um par da lista; marcar de novo não duplica", () => {
+  const r = D.registar({}, "tt1", "tt2", "tt1");
+  const ref = D.marcarRefazer(D.marcarRefazer([], r, ids(2)), r, ids(2));
+  assert.deepEqual(ref, ["tt1|tt2"]);
+  assert.deepEqual(D.concluir(ref, "tt2", "tt1"), []);
+  assert.equal(D.concluir(ref, "tt1", "tt3"), ref);
+});
+
+test("normalizar: refazer só guarda chaves válidas que têm resultado", () => {
+  const n = D.normalizar({ v: 1, res: { "tt1|tt2": "tt1", "tt1|tt3": "tt3" }, refazer: ["tt1|tt2", "tt2|tt3", "lixo", "tt2|tt1", 7, "tt1|tt2"] });
+  assert.deepEqual(n.refazer, ["tt1|tt2"]);
+  assert.deepEqual(D.normalizar({ v: 1, res: {} }).refazer, []);
+  assert.deepEqual(D.normalizar(null).refazer, []);
 });

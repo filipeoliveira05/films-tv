@@ -363,7 +363,8 @@
     if (!duelosGuardavel) nos.push(el("p", "tl-aviso", "Sem armazenamento neste browser: o progresso perde-se ao sair."));
     estado.tiers.forEach((t) => {
       const ids = T.listar(estado, t.id);
-      const { feitos, total } = DU.progresso(duelos.res, ids);
+      const { feitos, total } = DU.progresso(duelos.res, ids, duelos.refazer);
+      const linha = el("div", "tl-dl-linha");
       const b = botao("tl-dl-tier");
       b.dataset.tier = t.id;
       b.disabled = ids.length < 2;
@@ -371,7 +372,13 @@
       chip.style.background = t.cor;
       const estadoTxt = total === 0 ? "sem duelos" : feitos === total ? `${feitos}/${total} · ver ordem` : feitos ? `${feitos}/${total} · continuar` : `${feitos}/${total}`;
       b.append(chip, el("span", "tl-dl-n", `${ids.length} filmes`), el("span", "tl-dl-prog", estadoTxt));
-      nos.push(b);
+      linha.append(b);
+      if (ids.length >= 2 && DU.pares(ids).some(([x, y]) => duelos.res[DU.chave(x, y)] !== undefined)) { // só há o que refazer se já houver duelos feitos
+        const r = botao("tl-dl-refazer", "Refazer com categorias");
+        r.dataset.tier = t.id;
+        linha.append(r);
+      }
+      nos.push(linha);
     });
     mostrar(...nos);
   };
@@ -492,15 +499,15 @@
 
   const comecar = (tier) => {
     const ids = T.listar(estado, tier);
-    const fila = DU.ordemDosPares(DU.pendentes(duelos.res, ids));
+    const fila = DU.ordemDosPares(DU.pendentes(duelos.res, ids, duelos.refazer));
     dl = { tier, ids, fila, total: fila.length, feitos: 0, historico: [], rever: false };
     return fila.length ? mostrarDuelo() : mostrarOrdem();
   };
 
   const responderDuelo = (escolha) => {
     const [a, b] = dl.fila.shift();
-    dl.historico.push({ a, b, anterior: duelos.res[DU.chave(a, b)] });
-    duelos = { ...duelos, res: DU.registar(duelos.res, a, b, escolha) };
+    dl.historico.push({ a, b, anterior: duelos.res[DU.chave(a, b)], eraRefazer: duelos.refazer.includes(DU.chave(a, b)) });
+    duelos = { ...duelos, res: DU.registar(duelos.res, a, b, escolha), refazer: DU.concluir(duelos.refazer, a, b) };
     gravarDuelos();
     dl.feitos += 1;
     return dl.fila.length ? mostrarDuelo() : mostrarOrdem();
@@ -509,7 +516,11 @@
   const desfazerDuelo = () => {
     const h = dl.historico.pop();
     if (!h) return;
-    duelos = { ...duelos, res: h.anterior === undefined ? DU.remover(duelos.res, h.a, h.b) : DU.registar(duelos.res, h.a, h.b, h.anterior) };
+    duelos = {
+      ...duelos,
+      res: h.anterior === undefined ? DU.remover(duelos.res, h.a, h.b) : DU.registar(duelos.res, h.a, h.b, h.anterior),
+      refazer: h.eraRefazer ? [...duelos.refazer, DU.chave(h.a, h.b)] : duelos.refazer,
+    };
     gravarDuelos();
     dl.fila.unshift([h.a, h.b]);
     dl.feitos -= 1;
@@ -544,8 +555,15 @@
   });
   corpo.addEventListener("click", (e) => {
     const alvo = e.target.closest("button");
-    if (!alvo || !dl && !alvo.matches(".tl-dl-tier")) return;
+    if (!alvo || !dl && !alvo.matches(".tl-dl-tier, .tl-dl-refazer")) return;
     if (alvo.matches(".tl-dl-tier")) return comecar(alvo.dataset.tier);
+    if (alvo.matches(".tl-dl-refazer")) {
+      const nome = estado.tiers.find((t) => t.id === alvo.dataset.tier).nome;
+      if (!confirm(`Refazer os duelos do tier ${nome}? Cada duelo que responderes substitui o antigo; os que ainda não refizeres mantêm o resultado anterior.`)) return;
+      duelos = { ...duelos, refazer: DU.marcarRefazer(duelos.refazer, duelos.res, T.listar(estado, alvo.dataset.tier)) };
+      gravarDuelos();
+      return comecar(alvo.dataset.tier);
+    }
     if (alvo.matches(".tl-dl-card")) { dl.escolha.geral = alvo.dataset.film; return pintarEscolha(); }
     if (alvo.matches(".tl-dl-op")) { dl.escolha[alvo.dataset.cat] = alvo.dataset.val; return pintarEscolha(); }
     if (alvo.id === "tl-dl-confirmar") return dl.escolha.geral === null ? undefined : responderDuelo({ ...dl.escolha });

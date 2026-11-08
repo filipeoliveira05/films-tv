@@ -604,6 +604,9 @@ body.tl-sem-scroll { overflow: hidden; }
 
 .tl-dl-intro { margin: 0 0 1rem; color: var(--dim); }
 .tl-dl-tier { display: flex; align-items: center; gap: 0.8rem; width: 100%; min-height: 3.2rem; margin-bottom: 0.4rem; padding: 0.4rem 0.7rem; font: inherit; color: var(--ink); text-align: left; background: rgba(255, 255, 255, 0.08); border: 1px solid var(--line); border-radius: 6px; cursor: pointer; }
+.tl-dl-linha { margin-bottom: 0.4rem; }
+.tl-dl-linha .tl-dl-tier { margin-bottom: 0; }
+.tl-dl-refazer { display: block; margin: 0.2rem 0 0 auto; padding: 0.15rem 0.2rem; font: inherit; font-size: 0.8rem; color: var(--dim); text-decoration: underline; background: none; border: 0; cursor: pointer; }
 .tl-dl-tier:disabled { opacity: 0.4; cursor: default; }
 .tl-dl-chip { flex: none; min-width: 3.4rem; padding: 0.25rem 0.5rem; font-weight: 800; text-align: center; color: var(--deep); border-radius: 4px; }
 .tl-dl-n { flex: 1; color: var(--dim); }
