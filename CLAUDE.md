@@ -42,7 +42,7 @@ Achados do HTML real: cada programa é um `div.channel_data` com a hora em `<b>H
 
 ## GitHub Actions (`.github/workflows/atualizar.yml`)
 
-- **Gatilhos:** `schedule` (cron `17 5 * * *`, UTC), `workflow_dispatch` (com opção "só página") e `push` em `main` só se mudar `estilo.css`, `pagina.js`, `filmes_tv.py`, `tierlist.js`, `tierlist_estado.js`, `vendor/Sortable.min.js` ou o próprio workflow. Os pushes do bot (só `data/`) e os de documentação não o disparam.
+- **Gatilhos:** `schedule` (cron `17 5 * * *`, UTC), `workflow_dispatch` (com opção "só página") e `push` em `main` só se mudar `estilo.css`, `pagina.js`, `filmes_tv.py`, `tierlist.js`, `tierlist_estado.js`, `tierlist_duelos.js`, `vendor/Sortable.min.js` ou o próprio workflow. Os pushes do bot (só `data/`) e os de documentação não o disparam.
 - **Modo completo** (cron e disparo manual): corre os testes, `python filmes_tv.py` (scraping, matching, posters, elenco, ratings, página), faz commit de `data/` com `git pull --rebase` antes do push (aguenta pushes teus a meio) e publica no Pages. Se nenhum canal for lido, falha de propósito e não publica.
 - **Modo "só página"** (push, ou disparo manual com a opção): `python filmes_tv.py --relatorio` cria a base de dados do zero, importa `data/*.csv`, descarrega os ratings e gera a página. **Sem pedidos ao tudonumclick.com nem ao TMDB**, não precisa da chave e não faz commit. O `checkout` usa a ponta do ramo, para apanhar os dados mais recentes do bot.
 - `concurrency: filmes` (uma execução de cada vez). `data/atualizado.txt` é reescrito em cada execução completa, por isso o bot faz commit todos os dias.
@@ -110,7 +110,7 @@ Cada filme mostra o poster à direita (no telemóvel as emissões ocupam a largu
 - `filmes_tv.py`: todo o código.
 - `tmdb.svg`: logótipo oficial do TMDB (da página de atribuição deles), embutido no rodapé.
 - `estilo.css` e `pagina.js`: o estilo e o script da página; são embutidos em `filmes.html` pelo `report` (a página continua num só ficheiro).
-- `tierlist_estado.js`, `tierlist.js` e `vendor/Sortable.min.js` (com `vendor/Sortable.LICENSE`): a vista Tierlist (ver a secção "Tierlist"); também embutidos.
+- `tierlist_estado.js`, `tierlist_duelos.js`, `tierlist.js` e `vendor/Sortable.min.js` (com `vendor/Sortable.LICENSE`): a vista Tierlist (ver a secção "Tierlist"); também embutidos.
 - `docs/superpowers/`: desenho e plano da tierlist.
 - `tests/`: testes (`python -m unittest discover -s tests`).
 - `dev.py`: servidor local com recarregamento automático, só para desenvolvimento.
@@ -193,16 +193,16 @@ O Cinemundo foi retirado de propósito. Não voltar a acrescentar.
 11. ~~Pesquisa por nome e por ator~~ — feita (ver "Pesquisa"). Por fazer: pesquisa por canal.
 12. Podar `matches` sem nenhuma emissão há muito tempo (proposta: 90 dias; se o filme voltar, volta a ser identificado). Adiada por decisão do utilizador. Agora pesa mais: o elenco acrescenta ~650 bytes por linha de `data/matches.csv`, que nunca é podada.
 13. ~~Marcas de visto e guardado, filtro Guardados e Ocultar vistos~~ — feitas (ver "Marcas"). Por fazer, se fizer falta: exportar/importar as marcas (limpar o browser apaga-as), anular ao marcar visto com "ocultar" ligado.
-14. ~~Tierlist pessoal~~ — feita (ver "Tierlist"). Por validar: arrasto com o dedo e aspeto num telemóvel real.
+14. ~~Tierlist pessoal~~ — feita (ver "Tierlist"). Arrasto com o dedo confirmado num telemóvel real (13/10); duelos por categorias feitos (ver "Duelos"). Por validar: o ecrã de duelos num telemóvel real.
 15. Opcional: filtro de votos mínimos (para evitar notas altas com poucos votos), filtros por canal/rating na página.
 
 ## Retomar numa sessão nova
 
-Estado em 2026-10-13: tudo está commitado e enviado para o GitHub; a página online está atualizada. `python -m unittest discover -s tests` (147 testes, incluindo os de `node --test` da tierlist) passa. As verificações no browser estão em `tools/` (precisam do Chromium do Playwright e do `filmes.db`; se faltar, `python filmes_tv.py --relatorio`). **Coisas que nunca devem viver só no scratchpad ou na conversa:** scripts de verificação e decisões; tudo o que importa deve estar neste ficheiro ou no repo.
+Estado em 2026-11-08: tudo está commitado e enviado para o GitHub (`main`); a página online está atualizada, com a tierlist, os duelos por categorias, "Refazer com categorias" e o duelo sem scroll no computador. `python -m unittest discover -s tests` (147 testes, um deles corre os 60 de `node --test` da tierlist) passa, e `tools/verificar_tierlist.py` (S1 a S23) termina com "TUDO OK". As verificações no browser estão em `tools/` (precisam do Chromium do Playwright e do `filmes.db`; se faltar, `python filmes_tv.py --relatorio`). **Coisas que nunca devem viver só no scratchpad ou na conversa:** scripts de verificação e decisões; tudo o que importa deve estar neste ficheiro ou no repo.
 
 Forma de trabalhar combinada: antes de uma funcionalidade nova, perguntas **uma de cada vez** com opções e recomendação, depois um desenho curto e só se implementa com aprovação; testes primeiro; para mudanças de aspeto, ver capturas (`tools/capturar.py`); nunca fazer `git push` sem o utilizador pedir (regra global); fazer `git pull` antes de mexer, porque o bot atualiza `data/` todos os dias.
 
-Pendente, por ordem de interesse: (1) ver a página num telemóvel real; (2) pesquisa por canal (filtro por emissão, precisa de desenho); (3) poda de `matches` (adiada); (4) exportar/importar as marcas.
+Pendente, por ordem de interesse: (1) ver a página (e o ecrã de duelos, onde o Confirmar fica abaixo do ecrã e é preciso rolar) num telemóvel real; duelos: pesos editáveis e rankings por categoria, se fizerem falta; (2) pesquisa por canal (filtro por emissão, precisa de desenho); (3) poda de `matches` (adiada); (4) exportar/importar as marcas.
 
 ## Convenções
 
